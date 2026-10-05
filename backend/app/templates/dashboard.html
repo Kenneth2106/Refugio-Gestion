@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173b35">
+  <title>Panel | Refugio Gestión</title>
+  <style>
+    :root { font-family: "Segoe UI", sans-serif; color: #202c29; background: #f2f4ef; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; }
+    header {
+      min-height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 14px clamp(20px, 5vw, 72px);
+      background: #173b35;
+      color: #f5f4e8;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-family: Georgia, serif; font-size: 20px; }
+    .mark { display: grid; width: 36px; aspect-ratio: 1; place-items: center; border: 1px solid #93b7a1; color: #e5c878; font: 700 18px "Segoe UI", sans-serif; }
+    .account { display: flex; align-items: center; gap: 16px; }
+    .account span { color: #d2ddd5; font-size: 14px; }
+    button { min-height: 40px; padding: 8px 13px; border: 1px solid #91aa9d; border-radius: 4px; background: transparent; color: #fff; font: inherit; cursor: pointer; }
+    button:hover { background: #28564b; }
+    main { max-width: 1100px; margin: 0 auto; padding: clamp(32px, 7vw, 80px) 24px; }
+    .eyebrow { margin: 0 0 10px; color: #a64f3c; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+    h1 { margin: 0; font: 400 clamp(34px, 5vw, 52px)/1.1 Georgia, serif; }
+    .rule { width: 64px; height: 3px; margin: 24px 0; background: #d3a64d; }
+    .status { display: flex; align-items: center; gap: 9px; color: #53635b; }
+    .dot { width: 9px; aspect-ratio: 1; border-radius: 50%; background: #43815f; }
+    [role="alert"] { color: #9a3028; }
+    @media (max-width: 560px) {
+      header { align-items: flex-start; flex-direction: column; }
+      .account { width: 100%; justify-content: space-between; }
+      .account span { overflow-wrap: anywhere; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="mark" aria-hidden="true">R</span> Refugio Gestión</div>
+    <div class="account">
+      <span>{{ email }}</span>
+      <button id="logout-button" type="button">Cerrar sesión</button>
+    </div>
+  </header>
+  <main>
+    <p class="eyebrow">Área privada</p>
+    <h1>Panel de gestión</h1>
+    <div class="rule" aria-hidden="true"></div>
+    <p class="status"><span class="dot" aria-hidden="true"></span> Sesión activa</p>
+    <p id="logout-error" role="alert" aria-live="polite"></p>
+  </main>
+  <script>
+    const logoutButton = document.querySelector("#logout-button");
+    const logoutError = document.querySelector("#logout-error");
+
+    logoutButton.addEventListener("click", async () => {
+      logoutButton.disabled = true;
+      try {
+        const response = await fetch("/auth/logout", { method: "POST" });
+        if (!response.ok) {
+          logoutError.textContent = "La sesión ya no es válida.";
+          window.location.replace("/login");
+          return;
+        }
+        window.location.replace("/login");
+      } catch {
+        logoutError.textContent = "No se pudo conectar con el servidor.";
+        logoutButton.disabled = false;
+      }
+    });
+
+    window.setTimeout(
+      () => window.location.replace("/login?expired=1"),
+      Math.min({{ expires_in_seconds }} * 1000, 2147483647),
+    );
+  </script>
+</body>
+</html>
