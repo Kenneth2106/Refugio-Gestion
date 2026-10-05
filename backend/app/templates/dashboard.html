@@ -89,6 +89,42 @@
     }
 
     redirectWhenSessionExpires();
+
+    // Lógica de inactividad
+    let lastActivityTime = Date.now();
+    let isPinging = false;
+
+    function recordActivity() {
+      lastActivityTime = Date.now();
+    }
+
+    window.addEventListener("mousemove", recordActivity);
+    window.addEventListener("keydown", recordActivity);
+    window.addEventListener("click", recordActivity);
+    window.addEventListener("scroll", recordActivity);
+
+    setInterval(async () => {
+      const now = Date.now();
+      // Si lleva inactivo 3 minutos (180000 ms), redirigir
+      if (now - lastActivityTime > 3 * 60 * 1000) {
+        window.location.replace("/login?inactivity=1");
+        return;
+      }
+      // Si han pasado al menos 1 minuto desde el último ping y está activo, hacer ping
+      if (!isPinging && now - lastActivityTime < 60 * 1000) {
+        isPinging = true;
+        try {
+          const res = await fetch("/auth/ping", { method: "POST" });
+          if (res.status === 401) {
+            window.location.replace("/login?inactivity=1");
+          }
+        } catch (e) {
+          console.error(e);
+        } finally {
+          isPinging = false;
+        }
+      }
+    }, 30000); // Revisar cada 30 segundos
   </script>
 </body>
 </html>

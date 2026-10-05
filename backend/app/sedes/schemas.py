@@ -1,0 +1,34 @@
+from pydantic import BaseModel, ConfigDict, Field
+
+class MesaBase(BaseModel):
+    numero: int = Field(gt=0)
+    estado: bool = True
+
+class MesaCreate(MesaBase):
+    pass
+
+class MesaUpdate(BaseModel):
+    numero: int | None = Field(None, gt=0)
+    estado: bool | None = None
+
+class MesaOut(MesaBase):
+    id: int
+    sede_id: int
+    model_config = ConfigDict(from_attributes=True)
+
+class SedeBase(BaseModel):
+    codigo: str = Field(min_length=1, max_length=20)
+    nombre: str = Field(min_length=1, max_length=100)
+    estado: bool = True
+
+class SedeCreate(SedeBase):
+    pass
+
+class SedeUpdate(BaseModel):
+    codigo: str | None = Field(None, min_length=1, max_length=20)
+    nombre: str | None = Field(None, min_length=1, max_length=100)
+    estado: bool | None = None
+
+class SedeOut(SedeBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)

@@ -19,3 +19,8 @@ class SesionActiva(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+    ultima_actividad = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )

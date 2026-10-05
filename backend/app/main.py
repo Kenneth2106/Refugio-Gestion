@@ -7,7 +7,14 @@ from fastapi.templating import Jinja2Templates
 
 from app.auth.router import router as auth_router
 from app.auth.router import SesionAutenticada, get_current_session
+from app.sedes.router import router as sedes_router
+from app.usuarios.router import router as usuarios_router
 from app.core.database import Base, engine
+
+# Importar todos los modelos para que se creen las tablas
+from app.auth.models import SesionActiva  # noqa: F401
+from app.sedes.models import Sede, Mesa  # noqa: F401
+from app.usuarios.models import Usuario, UsuarioSede  # noqa: F401
 
 Base.metadata.create_all(bind=engine)
 
@@ -15,6 +22,8 @@ app = FastAPI(title="Sistema Refugio Gestión")
 templates = Jinja2Templates(directory=Path(__file__).resolve().parent / "templates")
 
 app.include_router(auth_router)
+app.include_router(sedes_router)
+app.include_router(usuarios_router)
 
 
 @app.exception_handler(RequestValidationError)

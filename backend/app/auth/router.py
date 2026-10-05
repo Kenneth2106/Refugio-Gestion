@@ -1,6 +1,6 @@
 import secrets
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -12,7 +12,8 @@ from app.auth.schemas import LoginSchema, TokenSchema
 from app.core.database import get_db
 from app.core.security import create_access_token, decode_access_token, verify_password
 from app.core.settings import (
-    ACCESS_TOKEN_EXPIRE_MINUTES,
+    SESSION_INACTIVITY_MINUTES,
+    SESSION_MAX_MINUTES,
     AUTH_COOKIE_NAME,
     COOKIE_SECURE,
 )
@@ -84,6 +85,39 @@ def get_current_session(
     if sesion is None or not secrets.compare_digest(sesion.jti, jti):
         raise unauthorized()
 
+    now = datetime.now(timezone.utc)
+
+    def _to_utc_naive(dt: datetime) -> datetime:
+        """Devuelve el datetime como UTC naive para comparaciones consistentes."""
+        if dt.tzinfo is not None:
+            return dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+
+    now_naive = _to_utc_naive(now)
+
+    # Validar inactividad
+    if now_naive - _to_utc_naive(sesion.ultima_actividad) > timedelta(minutes=SESSION_INACTIVITY_MINUTES):
+        db.delete(sesion)
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesión cerrada por inactividad",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Validar tiempo máximo
+    if now_naive - _to_utc_naive(sesion.creada_en) > timedelta(minutes=SESSION_MAX_MINUTES):
+        db.delete(sesion)
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesión expirada",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    sesion.ultima_actividad = now
+    db.commit()
+
     return SesionAutenticada(usuario=usuario, jti=jti, expires_at=expires_at)
 
 
@@ -91,6 +125,11 @@ def get_current_user(
     session: SesionAutenticada = Depends(get_current_session),
 ) -> Usuario:
     return session.usuario
+
+def require_admin(usuario: Usuario = Depends(get_current_user)) -> Usuario:
+    if not usuario.es_admin:
+        raise HTTPException(status_code=403, detail="Requiere privilegios de administrador")
+    return usuario
 
 
 @router.post("/login", response_model=TokenSchema)
@@ -121,17 +160,20 @@ def login(
         )
 
     jti = secrets.token_urlsafe(32)
-    expires_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expires_delta = timedelta(minutes=SESSION_MAX_MINUTES)
     access_token = create_access_token(
         data={"sub": usuario.email, "user_id": usuario.id, "jti": jti},
         expires_delta=expires_delta,
     )
 
     sesion = db.query(SesionActiva).filter_by(usuario_id=usuario.id).first()
+    now = datetime.now(timezone.utc)
     if sesion is None:
-        db.add(SesionActiva(usuario_id=usuario.id, jti=jti))
+        db.add(SesionActiva(usuario_id=usuario.id, jti=jti, creada_en=now, ultima_actividad=now))
     else:
         sesion.jti = jti
+        sesion.creada_en = now
+        sesion.ultima_actividad = now
     db.commit()
 
     response.set_cookie(
@@ -169,3 +211,10 @@ def logout(
         path="/",
     )
     return {"message": "Sesión cerrada correctamente"}
+
+
+@router.post("/ping")
+def ping(
+    session: SesionAutenticada = Depends(get_current_session)
+) -> dict[str, str]:
+    return {"message": "pong"}

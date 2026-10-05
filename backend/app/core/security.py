@@ -3,7 +3,7 @@ from typing import Mapping
 
 import bcrypt
 from jose import jwt
-from app.core.settings import ACCESS_TOKEN_EXPIRE_MINUTES, ALGORITHM, SECRET_KEY
+from app.core.settings import SESSION_MAX_MINUTES, ALGORITHM, SECRET_KEY
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
@@ -31,7 +31,7 @@ def create_access_token(
         {
             "iat": now,
             "exp": now
-            + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)),
+            + (expires_delta or timedelta(minutes=SESSION_MAX_MINUTES)),
         }
     )
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)

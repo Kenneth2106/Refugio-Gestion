@@ -124,6 +124,13 @@
     const button = document.querySelector("#submit-button");
     const error = document.querySelector("#login-error");
 
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("inactivity") === "1") {
+      error.textContent = "Tu sesión ha sido cerrada por inactividad.";
+    } else if (params.get("expired") === "1") {
+      error.textContent = "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.";
+    }
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       button.disabled = true;

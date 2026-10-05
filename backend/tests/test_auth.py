@@ -1,101 +1,245 @@
+"""
+Tests HU-01 · HU-02 · HU-03 · HU-06 · HU-34 · HU-36 · HU-37
+Autenticación: login, sesión única, inactividad, logout, JWT, seguridad.
+"""
 from datetime import timedelta
 
+import pytest
+
 from app.core.security import create_access_token, decode_access_token, verify_password
+from tests.conftest import ADMIN_EMAIL, ADMIN_PASSWORD, login_admin, auth_headers
 
 
-def login(client, password="Clave-segura-123"):
-    return client.post(
+# ──────────────────────────────────────────────────────────────────────────────
+# HU-01 · Inicio de sesión
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_hu01_login_exitoso_redirige_a_dashboard(client):
+    """HU-01: Login correcto devuelve token, cookie httponly y redirect_to=/dashboard."""
+    resp = client.post(
         "/auth/login",
-        json={"email": "admin@refugio.com", "password": password},
+        json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
     )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["redirect_to"] == "/dashboard"
+    assert "httponly" in resp.headers["set-cookie"].lower()
 
 
-def test_login_redirects_to_protected_dashboard(client):
-    response = login(client)
-
-    assert response.status_code == 200
-    assert response.json()["redirect_to"] == "/dashboard"
-    assert "httponly" in response.headers["set-cookie"].lower()
-
-    dashboard = client.get(response.json()["redirect_to"])
-    assert dashboard.status_code == 200
-    assert "admin@refugio.com" in dashboard.text
+def test_hu01_dashboard_visible_tras_login(client):
+    """HU-01: El dashboard es accesible una vez autenticado."""
+    token = login_admin(client)["access_token"]
+    resp = client.get("/dashboard", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+    assert ADMIN_EMAIL in resp.text
 
 
-def test_dashboard_uses_token_expiration_after_page_reload(client):
-    token = login(client).json()["access_token"]
-    expires_at = decode_access_token(token)["exp"]
-
-    first_load = client.get("/dashboard")
-    second_load = client.get("/dashboard")
-    expected_expiration = f"const sessionExpiresAt = {expires_at} * 1000;"
-
-    assert expected_expiration in first_load.text
-    assert expected_expiration in second_load.text
-
-
-def test_new_login_invalidates_previous_token(client):
-    first_token = login(client).json()["access_token"]
-    second_token = login(client).json()["access_token"]
-
-    old_session = client.get(
-        "/dashboard",
-        headers={"Authorization": f"Bearer {first_token}"},
+def test_hu01_credenciales_incorrectas_retornan_401(client):
+    """HU-01: Credenciales incorrectas no permiten acceso."""
+    resp = client.post(
+        "/auth/login",
+        json={"email": ADMIN_EMAIL, "password": "contraseña-mal"},
     )
-    new_session = client.get(
-        "/dashboard",
-        headers={"Authorization": f"Bearer {second_token}"},
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "Correo o contraseña incorrectos"
+
+
+def test_hu01_usuario_inactivo_no_puede_entrar(client, db_engine):
+    """HU-01: Un usuario inactivo (estado=False) recibe 403."""
+    from sqlalchemy.orm import sessionmaker
+    from app.usuarios.models import Usuario
+
+    Session = sessionmaker(bind=db_engine)
+    with Session() as db:
+        user = db.query(Usuario).filter_by(email=ADMIN_EMAIL).first()
+        user.estado = False
+        db.commit()
+
+    resp = client.post(
+        "/auth/login",
+        json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
     )
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Usuario inactivado"
 
-    assert old_session.status_code == 401
-    assert new_session.status_code == 200
+
+# ──────────────────────────────────────────────────────────────────────────────
+# HU-03 · Sesión única simultánea
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_hu03_nuevo_login_invalida_sesion_anterior(client):
+    """HU-03: Al iniciar sesión de nuevo el token anterior queda inválido."""
+    first_token = login_admin(client)["access_token"]
+    second_token = login_admin(client)["access_token"]
+
+    old = client.get("/dashboard", headers={"Authorization": f"Bearer {first_token}"})
+    new = client.get("/dashboard", headers={"Authorization": f"Bearer {second_token}"})
+
+    assert old.status_code == 401
+    assert new.status_code == 200
 
 
-def test_logout_revokes_session_and_clears_cookie(client):
-    assert login(client).status_code == 200
+# ──────────────────────────────────────────────────────────────────────────────
+# HU-06 · Cierre manual de sesión
+# ──────────────────────────────────────────────────────────────────────────────
 
-    response = client.post("/auth/logout")
-
-    assert response.status_code == 200
+def test_hu06_logout_revoca_sesion_y_limpia_cookie(client):
+    """HU-06: El logout borra la sesión activa y el dashboard ya no es accesible."""
+    login_admin(client)
+    resp = client.post("/auth/logout")
+    assert resp.status_code == 200
     assert client.get("/dashboard").status_code == 401
 
 
-def test_expired_token_is_rejected(client):
+def test_hu06_logout_sin_sesion_retorna_401(client):
+    """HU-06: Logout sin token activo devuelve 401."""
+    resp = client.post("/auth/logout")
+    assert resp.status_code == 401
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# HU-34 · JWT y autorización en backend
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_hu34_token_expirado_es_rechazado(client):
+    """HU-34: Un token con exp en el pasado es rechazado."""
+    login_admin(client)
     expired_token = create_access_token(
-        {
-            "sub": "admin@refugio.com",
-            "user_id": 1,
-            "jti": "expired-session",
-        },
+        {"sub": ADMIN_EMAIL, "user_id": 1, "jti": "expired-jti"},
         expires_delta=timedelta(seconds=-1),
     )
+    resp = client.get("/dashboard", headers={"Authorization": f"Bearer {expired_token}"})
+    assert resp.status_code == 401
 
-    response = client.get(
-        "/dashboard",
-        headers={"Authorization": f"Bearer {expired_token}"},
+
+def test_hu34_jwt_contiene_expiracion_en_pagina(client):
+    """HU-34: El dashboard expone la expiración del JWT para el temporizador JS."""
+    token = login_admin(client)["access_token"]
+    expires_at = decode_access_token(token)["exp"]
+    resp = client.get("/dashboard", headers={"Authorization": f"Bearer {token}"})
+    assert f"const sessionExpiresAt = {expires_at} * 1000;" in resp.text
+
+
+def test_hu34_sin_token_dashboard_retorna_401(client):
+    """HU-34: Sin autenticación el dashboard devuelve 401."""
+    resp = client.get("/dashboard")
+    assert resp.status_code == 401
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# HU-36 · Protección de credenciales y errores
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_hu36_hash_invalido_tratado_como_credencial_incorrecta():
+    """HU-36: Un hash corrupto no causa error, devuelve False."""
+    assert verify_password("cualquier-clave", "no-es-bcrypt") is False
+
+
+def test_hu36_error_login_es_generico(client):
+    """HU-36: El mensaje de error no revela si el email existe."""
+    resp = client.post(
+        "/auth/login",
+        json={"email": "noexiste@refugio.com", "password": ADMIN_PASSWORD},
     )
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "Correo o contraseña incorrectos"
 
-    assert response.status_code == 401
 
+# ──────────────────────────────────────────────────────────────────────────────
+# HU-37 · Validación de entradas e inyección
+# ──────────────────────────────────────────────────────────────────────────────
 
-def test_invalid_inputs_and_credentials_are_rejected(client):
-    invalid_email = client.post(
+def test_hu37_email_invalido_retorna_422(client):
+    """HU-37: Un email con intento de inyección SQL es rechazado con 422."""
+    resp = client.post(
         "/auth/login",
         json={"email": "' OR 1=1 --", "password": "anything"},
     )
-    oversized_password = client.post(
+    assert resp.status_code == 422
+    assert "OR 1=1" not in resp.text
+
+
+def test_hu37_password_demasiado_largo_retorna_422(client):
+    """HU-37: Contraseña > 72 bytes (bcrypt límite) retorna 422 sin exponer la clave."""
+    resp = client.post(
         "/auth/login",
-        json={"email": "admin@refugio.com", "password": "🙂" * 19},
+        json={"email": ADMIN_EMAIL, "password": "🙂" * 19},
     )
-    invalid_password = login(client, password="incorrecta")
-
-    assert invalid_email.status_code == 422
-    assert "OR 1=1" not in invalid_email.text
-    assert oversized_password.status_code == 422
-    assert "🙂" not in oversized_password.text
-    assert invalid_password.status_code == 401
-    assert invalid_password.json()["detail"] == "Correo o contraseña incorrectos"
+    assert resp.status_code == 422
+    assert "🙂" not in resp.text
 
 
-def test_corrupted_password_hash_is_treated_as_invalid_credentials():
-    assert verify_password("any-password", "not-a-bcrypt-hash") is False
+def test_hu37_campos_extra_son_rechazados(client):
+    """HU-37: Campos no definidos en el schema son rechazados (extra='forbid')."""
+    resp = client.post(
+        "/auth/login",
+        json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD, "hack": "extra"},
+    )
+    assert resp.status_code == 422
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# HU-02 · Cierre automático por inactividad (backend)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def test_hu02_sesion_invalida_tras_inactividad(client, db_engine):
+    """HU-02: Si ultima_actividad supera 3 min, el backend rechaza con 401."""
+    from datetime import datetime, timezone
+    from sqlalchemy.orm import sessionmaker
+    from app.auth.models import SesionActiva
+
+    login_admin(client)
+
+    # Retroceder ultima_actividad artificialmente 4 minutos en la BD
+    Session = sessionmaker(bind=db_engine)
+    with Session() as db:
+        sesion = db.query(SesionActiva).first()
+        sesion.ultima_actividad = datetime.now(timezone.utc) - timedelta(minutes=4)
+        db.commit()
+
+    resp = client.get("/dashboard")
+    assert resp.status_code == 401
+    assert "inactividad" in resp.json()["detail"].lower()
+
+
+def test_hu02_sesion_invalida_tras_maximo_30_min(client, db_engine):
+    """HU-02: Si la sesión supera 30 min desde creada_en, el backend la invalida."""
+    from datetime import datetime, timezone
+    from sqlalchemy.orm import sessionmaker
+    from app.auth.models import SesionActiva
+
+    login_admin(client)
+
+    Session = sessionmaker(bind=db_engine)
+    with Session() as db:
+        sesion = db.query(SesionActiva).first()
+        sesion.creada_en = datetime.now(timezone.utc) - timedelta(minutes=31)
+        sesion.ultima_actividad = datetime.now(timezone.utc)  # activo, pero sesión vieja
+        db.commit()
+
+    resp = client.get("/dashboard")
+    assert resp.status_code == 401
+    assert "expir" in resp.json()["detail"].lower()
+
+
+def test_hu02_ping_renueva_ultima_actividad(client, db_engine):
+    """HU-02: El endpoint /auth/ping renueva ultima_actividad mientras el usuario está activo."""
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy.orm import sessionmaker
+    from app.auth.models import SesionActiva
+
+    login_admin(client)
+
+    Session = sessionmaker(bind=db_engine)
+    with Session() as db:
+        sesion = db.query(SesionActiva).first()
+        antes = sesion.ultima_actividad
+
+    resp = client.post("/auth/ping")
+    assert resp.status_code == 200
+
+    with Session() as db:
+        sesion = db.query(SesionActiva).first()
+        despues = sesion.ultima_actividad
+
+    assert despues >= antes

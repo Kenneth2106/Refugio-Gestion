@@ -1,8 +1,10 @@
 import os
 
+# Vars de entorno ANTES de importar cualquier módulo de la app
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["SECRET_KEY"] = "test-only-secret-key-with-at-least-32-bytes"
-os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"] = "60"
+os.environ["SESSION_INACTIVITY_MINUTES"] = "3"
+os.environ["SESSION_MAX_MINUTES"] = "30"
 os.environ["COOKIE_SECURE"] = "false"
 
 import pytest
@@ -11,22 +13,33 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.auth.router import get_current_session
 from app.core.database import Base, get_db
 from app.core.security import get_password_hash
 from app.main import app
-from app.usuarios.models import Usuario
+from app.usuarios.models import Usuario, UsuarioSede
+from app.sedes.models import Sede
+
+
+ADMIN_EMAIL = "admin@refugio.com"
+ADMIN_PASSWORD = "Clave-segura-123"
 
 
 @pytest.fixture
-def client():
+def db_engine():
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
-    testing_session = sessionmaker(autoflush=False, bind=engine)
+    yield engine
+    Base.metadata.drop_all(bind=engine)
+    engine.dispose()
+
+
+@pytest.fixture
+def client(db_engine):
+    testing_session = sessionmaker(autoflush=False, bind=db_engine)
 
     def override_get_db():
         db = testing_session()
@@ -36,19 +49,37 @@ def client():
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
+
     with testing_session() as db:
-        db.add(
-            Usuario(
-                email="admin@refugio.com",
-                hashed_password=get_password_hash("Clave-segura-123"),
-                estado=True,
-            )
+        admin = Usuario(
+            identificacion="0000000000",
+            nombre="Administrador Sistema",
+            email=ADMIN_EMAIL,
+            hashed_password=get_password_hash(ADMIN_PASSWORD),
+            estado=True,
+            es_admin=True,
+            es_mesero=True,
+            es_cajero=True,
         )
+        db.add(admin)
         db.commit()
 
     with TestClient(app) as test_client:
         yield test_client
 
     app.dependency_overrides.clear()
-    Base.metadata.drop_all(bind=engine)
-    engine.dispose()
+
+
+def login_admin(client) -> dict:
+    """Helper: autentica al admin y devuelve el JSON de respuesta."""
+    resp = client.post(
+        "/auth/login",
+        json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()
+
+
+def auth_headers(client) -> dict:
+    """Devuelve cabecera Authorization con el token del admin."""
+    return {"Authorization": f"Bearer {login_admin(client)['access_token']}"}
