@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from app.core.security import create_access_token, verify_password
+from app.core.security import create_access_token, decode_access_token, verify_password
 
 
 def login(client, password="Clave-segura-123"):
@@ -20,6 +20,18 @@ def test_login_redirects_to_protected_dashboard(client):
     dashboard = client.get(response.json()["redirect_to"])
     assert dashboard.status_code == 200
     assert "admin@refugio.com" in dashboard.text
+
+
+def test_dashboard_uses_token_expiration_after_page_reload(client):
+    token = login(client).json()["access_token"]
+    expires_at = decode_access_token(token)["exp"]
+
+    first_load = client.get("/dashboard")
+    second_load = client.get("/dashboard")
+    expected_expiration = f"const sessionExpiresAt = {expires_at} * 1000;"
+
+    assert expected_expiration in first_load.text
+    assert expected_expiration in second_load.text
 
 
 def test_new_login_invalidates_previous_token(client):

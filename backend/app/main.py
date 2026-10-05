@@ -8,7 +8,6 @@ from fastapi.templating import Jinja2Templates
 from app.auth.router import router as auth_router
 from app.auth.router import SesionAutenticada, get_current_session
 from app.core.database import Base, engine
-from app.core.settings import ACCESS_TOKEN_EXPIRE_MINUTES
 
 Base.metadata.create_all(bind=engine)
 
@@ -59,6 +58,6 @@ def dashboard(
         name="dashboard.html",
         context={
             "email": session.usuario.email,
-            "expires_in_seconds": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            "expires_at": session.expires_at,
         },
     )

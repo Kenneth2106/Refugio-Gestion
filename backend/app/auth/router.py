@@ -34,6 +34,7 @@ def unauthorized() -> HTTPException:
 class SesionAutenticada:
     usuario: Usuario
     jti: str
+    expires_at: int
 
 
 def get_current_session(
@@ -57,7 +58,13 @@ def get_current_session(
     user_id = payload.get("user_id")
     subject = payload.get("sub")
     jti = payload.get("jti")
-    if type(user_id) is not int or not isinstance(subject, str) or not isinstance(jti, str):
+    expires_at = payload.get("exp")
+    if (
+        type(user_id) is not int
+        or not isinstance(subject, str)
+        or not isinstance(jti, str)
+        or type(expires_at) is not int
+    ):
         raise unauthorized()
 
     usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
@@ -77,7 +84,7 @@ def get_current_session(
     if sesion is None or not secrets.compare_digest(sesion.jti, jti):
         raise unauthorized()
 
-    return SesionAutenticada(usuario=usuario, jti=jti)
+    return SesionAutenticada(usuario=usuario, jti=jti, expires_at=expires_at)
 
 
 def get_current_user(
