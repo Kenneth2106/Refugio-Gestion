@@ -1,17 +1,27 @@
-import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig } from "vite"
 
-// https://vite.dev/config/
+const apiPaths = [
+  "/auth",
+  "/usuarios",
+  "/sedes",
+  "/mesas",
+  "/productos",
+  "/proveedores",
+  "/inventario",
+  "/pedidos",
+  "/admin",
+]
+
 export default defineConfig({
-  plugins: [react()],
   server: {
     host: "127.0.0.1",
     port: 5175,
     strictPort: true,
-    proxy: {
-      "/auth": { target: "http://127.0.0.1:8000", changeOrigin: true },
-      "/usuarios": { target: "http://127.0.0.1:8000", changeOrigin: true },
-      "/sedes": { target: "http://127.0.0.1:8000", changeOrigin: true },
-    },
+    proxy: Object.fromEntries(
+      apiPaths.map((path) => [
+        path,
+        { target: "http://127.0.0.1:8000", changeOrigin: true },
+      ]),
+    ),
   },
 })

@@ -15,7 +15,9 @@ comercial.
 
 ## Exclusiones transversales de esta entrega
 
-- Frontend.
+- En la implementación inicial del backend, frontend; queda incorporada por
+  aprobación posterior como una entrega HTML5/CSS3/JavaScript que consume los
+  endpoints existentes REST/JSON.
 - Exportación a Excel.
 - Despliegue con Nginx, TLS o Gunicorn.
 - Pagos, cierre de pedidos y otras funcionalidades posteriores al alcance
@@ -41,3 +43,13 @@ comercial.
   pedidos abiertos y estados de mesas.
 - Un JWT válido se renueva en cada petición autenticada, con expiración a los
   3 minutos de actividad y un límite absoluto de 30 minutos desde el login.
+
+## Aprobación posterior: interfaz web
+
+- La interfaz usa HTML5, CSS3 y JavaScript nativo, sin React.
+- La sidebar mantiene los mismos módulos para todos los usuarios. Al entrar a
+  un módulo no permitido, se muestra un aviso de permisos; el backend sigue
+  siendo quien valida autorización en cada petición.
+- La interfaz cubre los módulos backend en alcance: usuarios, sedes, catálogo,
+  inventario, mesas y pedidos abiertos. No añade pagos, cierre, reportes,
+  exportación ni despliegue.

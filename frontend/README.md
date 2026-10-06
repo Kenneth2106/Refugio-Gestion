@@ -1,31 +1,33 @@
-# Refugio Management Frontend
+# Refugio Gestión — Frontend
 
-The interface is a React single-page application. FastAPI remains the API and session authority.
+The frontend is a responsive HTML5/CSS3/JavaScript interface. It uses native
+JavaScript modules and sends REST/JSON requests to the FastAPI backend. It does
+not use React.
 
 ## Local development
 
-1. Start the backend from `backend` with `.venv\Scripts\python.exe -m uvicorn app.main:app --reload`.
-2. From this folder, install packages with `npm install`.
-3. Start React with `npm run dev` and open `http://127.0.0.1:5175`.
+1. Start FastAPI from `backend`:
+   `.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload`
+2. From this folder, install the development tool:
+   `npm install`
+3. Start the UI with `npm run dev` and open
+   `http://127.0.0.1:5175`.
 
-Vite proxies `/auth`, `/usuarios`, and `/sedes` to FastAPI on port `8000`. The browser session uses the backend's HttpOnly cookie. Keep database credentials in `backend/.env`; never copy them into this project.
+Vite proxies the backend API routes to `http://127.0.0.1:8000`. The browser
+session uses the backend's HttpOnly cookie. Database credentials remain in
+`backend/.env`; never copy them into this project.
+
+## Access control and modules
+
+The sidebar stays the same for every signed-in user. Opening a module the
+current account cannot access shows a permission notice; the backend remains
+the authority and validates every protected request.
+
+The UI connects the in-scope backend modules for sign-in/session management,
+users, locations, products and suppliers, per-location inventory, tables, and
+open orders. Payment, order closing, sales reports, Excel export, and deployment
+configuration are not included.
 
 ## Checks
 
-- `npm run lint`
-- `npm run build`# React + Vite
-
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+- `npm run build`

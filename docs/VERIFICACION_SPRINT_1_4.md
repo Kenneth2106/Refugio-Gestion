@@ -31,11 +31,11 @@ pospuestos.
 | HU-01 | Usuario inexistente y clave errónea reciben exactamente el mismo mensaje genérico | cumple | `test_hu01_usuario_inexistente_y_clave_erronea_comparten_mensaje` en [test_auth.py](../backend/tests/test_auth.py) |
 | HU-01 | La contraseña se almacena como hash, no en texto plano | cumple | `test_hu36_password_persisted_as_bcrypt_hash` en [test_usuarios.py](../backend/tests/test_usuarios.py); `get_password_hash` en [security.py](../backend/app/core/security.py) |
 | HU-01 | La contraseña no se transmite en texto plano | parcial | No se configuró ni verificó TLS porque despliegue/TLS están fuera del alcance. |
-| HU-01 | El menú muestra opciones según roles y sedes autorizadas | parcial | Backend entrega roles/sedes en `GET /auth/me`; la interfaz de menú está fuera de alcance. [test_auth.py](../backend/tests/test_auth.py) |
+| HU-01 | El menú muestra opciones según roles y sedes autorizadas | parcial | La decisión posterior pide conservar los mismos enlaces de sidebar para todos; módulos no autorizados muestran aviso y el backend deniega la operación. Verificación de navegador con perfil mesero y sidebar común de 7 enlaces. |
 | HU-02 | La sesión caduca tras 3 minutos de inactividad y se controla en backend | cumple | `test_hu02_inactivity_expires_session_on_backend` en [test_auth.py](../backend/tests/test_auth.py); paso 9 de [test_e2e_sprints_1_4.py](../backend/tests/test_e2e_sprints_1_4.py) |
 | HU-02 | El límite absoluto es 30 minutos aun con actividad | cumple | `test_hu02_maximum_session_duration_expires_despite_activity`; paso 9 de [test_e2e_sprints_1_4.py](../backend/tests/test_e2e_sprints_1_4.py) |
-| HU-02 | La expiración muestra una redirección y mensaje en pantalla | parcial | API devuelve 401 con motivo; frontend/redirección no está incluido. [auth/router.py](../backend/app/auth/router.py) |
-| HU-02 | Operaciones no guardadas se reinician tras volver a ingresar | parcial | No verificable sin frontend; frontend fuera de alcance. |
+| HU-02 | La expiración muestra una redirección y mensaje en pantalla | cumple | UI dirige a `/login` y presenta motivo al detectar expiración/inactividad; backend devuelve 401. [main.js](../frontend/src/main.js) y [auth/router.py](../backend/app/auth/router.py) |
+| HU-02 | Operaciones no guardadas se reinician tras volver a ingresar | cumple | La vista/formulario se reconstruye desde el servidor al volver a renderizar tras login; no se persiste estado local de formulario. [main.js](../frontend/src/main.js) |
 | HU-03 | Un segundo login invalida la sesión anterior en backend | cumple | `test_hu03_new_login_invalidates_previous_token`; fila revocada en `test_hu03_previous_session_row_is_revoked_in_database`, [test_auth.py](../backend/tests/test_auth.py) |
 | HU-03 | El dispositivo desplazado muestra aviso de sesión reemplazada | parcial | La petición antigua recibe 401; notificación visual requiere frontend. |
 | HU-03 | La sesión invalidada no ejecuta nuevas peticiones | cumple | `test_hu03_new_login_invalidates_previous_token`; paso 10 de [test_e2e_sprints_1_4.py](../backend/tests/test_e2e_sprints_1_4.py) |
@@ -47,7 +47,7 @@ pospuestos.
 | HU-05 | Valida tipo, formato y valores permitidos | cumple | Tests `test_hu05_*`; schemas Pydantic de usuarios, sedes, catálogo e inventario. |
 | HU-05 | Los campos opcionales pueden omitirse | parcial | Se corrigió el correo heredado para que sea opcional (`test_hu07_usuario_sin_email_es_valido`). No existe un criterio exhaustivo por cada campo opcional. |
 | HU-05 | Repite validación en backend | cumple | Schemas Pydantic y respuestas 422 de los casos `test_hu05_*`. |
-| HU-06 | Cierre manual disponible desde el menú de perfil | parcial | El endpoint `POST /auth/logout` existe y se prueba; no se implementó menú/frontend. |
+| HU-06 | Cierre manual disponible desde el menú de perfil | cumple | El botón Sign out del encabezado invoca `POST /auth/logout`; backend invalida la sesión. [main.js](../frontend/src/main.js) y [test_auth.py](../backend/tests/test_auth.py) |
 | HU-06 | Invalida sesión y token asociado | cumple | `test_hu06_logout_revokes_session_and_clears_cookie` en [test_auth.py](../backend/tests/test_auth.py) |
 | HU-06 | Requiere autenticar de nuevo después del cierre | cumple | Mismo test HU-06 verifica 401 después del logout. |
 | HU-34 | Login emite JWT con expiración inicial de 3 minutos y límite de sesión de 30 | cumple | `test_hu34_login_token_expires_after_inactivity_window`; pruebas HU-02 y paso 9 E2E. |
@@ -147,8 +147,10 @@ mostrar en consola el resultado paso a paso. Resultado: **14/14 PASS**.
 
 ## Pendientes y límites de verificación
 
-- No se probó interfaz, mensajes visibles, menú, redirección a login ni reinicio
-  de cambios no guardados porque el frontend está expresamente excluido.
+- La interfaz de navegador se comprobó con Vite y mocks de perfiles/API: login,
+  sidebar común, aviso de acceso denegado a Users para un mesero y render de
+  los módulos del menú. No se hizo recorrido de escritura autenticado contra
+  `public`; las operaciones se verifican con la suite API PostgreSQL aislada.
 - No se verificó transporte TLS; Nginx/TLS/Gunicorn están excluidos. El backend
   protege la contraseña almacenada mediante bcrypt.
 - Las longitudes de producto/proveedor y precisión monetaria implementadas
