@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_db
 from app.auth.router import require_admin, get_current_user
-from app.usuarios.models import Usuario
+from app.usuarios.models import Usuario, UsuarioSede
 from app.sedes.models import Sede, Mesa
 from app.sedes.schemas import SedeCreate, SedeUpdate, SedeOut, MesaCreate, MesaUpdate, MesaOut
 
@@ -33,12 +33,14 @@ def listar_sedes(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    # Si es admin, ve todas. Si no, solo las que tiene asignadas.
     if current_user.es_admin:
         return db.query(Sede).all()
-    else:
-        # Se obtienen las sedes asignadas al usuario operativo
-        return [us.sede for us in current_user.sedes]
+    return (
+        db.query(Sede)
+        .join(UsuarioSede, UsuarioSede.sede_id == Sede.id)
+        .filter(UsuarioSede.usuario_id == current_user.id)
+        .all()
+    )
 
 
 @router.patch("/{sede_id}", response_model=SedeOut)
@@ -51,6 +53,8 @@ def actualizar_sede(
     sede = db.query(Sede).filter(Sede.id == sede_id).first()
     if not sede:
         raise HTTPException(status_code=404, detail="Sede no encontrada")
+    if not current_user.es_admin and not db.query(UsuarioSede).filter_by(usuario_id=current_user.id, sede_id=sede_id).first():
+        raise HTTPException(status_code=403, detail="No tienes acceso a esta sede")
     
     update_data = sede_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -75,6 +79,8 @@ def crear_mesa(
     sede = db.query(Sede).filter(Sede.id == sede_id).first()
     if not sede:
         raise HTTPException(status_code=404, detail="Sede no encontrada")
+    if not current_user.es_admin and not db.query(UsuarioSede).filter_by(usuario_id=current_user.id, sede_id=sede_id).first():
+        raise HTTPException(status_code=403, detail="No tienes acceso a esta sede")
         
     # Verificar que el número de mesa no exista en la sede
     mesa_existente = db.query(Mesa).filter(Mesa.sede_id == sede_id, Mesa.numero == mesa_in.numero).first()
@@ -83,8 +89,12 @@ def crear_mesa(
         
     mesa = Mesa(sede_id=sede.id, **mesa_in.model_dump())
     db.add(mesa)
-    db.commit()
-    db.refresh(mesa)
+    try:
+        db.commit()
+        db.refresh(mesa)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="El número de mesa ya existe en esta sede")
     return mesa
 
 
@@ -94,10 +104,8 @@ def listar_mesas_sede(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    # Validar acceso a la sede
-    if not current_user.es_admin:
-        if not any(us.sede_id == sede_id for us in current_user.sedes):
-            raise HTTPException(status_code=403, detail="No tienes acceso a esta sede")
+    if not current_user.es_admin and not db.query(UsuarioSede).filter_by(usuario_id=current_user.id, sede_id=sede_id).first():
+        raise HTTPException(status_code=403, detail="No tienes acceso a esta sede")
             
     return db.query(Mesa).filter(Mesa.sede_id == sede_id).all()
 
@@ -112,6 +120,8 @@ def actualizar_mesa(
     mesa = db.query(Mesa).filter(Mesa.id == mesa_id).first()
     if not mesa:
         raise HTTPException(status_code=404, detail="Mesa no encontrada")
+    if not current_user.es_admin and not db.query(UsuarioSede).filter_by(usuario_id=current_user.id, sede_id=mesa.sede_id).first():
+        raise HTTPException(status_code=403, detail="No tienes acceso a esta sede")
         
     if mesa_in.numero is not None and mesa_in.numero != mesa.numero:
         mesa_existente = db.query(Mesa).filter(Mesa.sede_id == mesa.sede_id, Mesa.numero == mesa_in.numero).first()
@@ -122,6 +132,10 @@ def actualizar_mesa(
     for field, value in update_data.items():
         setattr(mesa, field, value)
         
-    db.commit()
-    db.refresh(mesa)
+    try:
+        db.commit()
+        db.refresh(mesa)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="El número de mesa ya existe en esta sede")
     return mesa

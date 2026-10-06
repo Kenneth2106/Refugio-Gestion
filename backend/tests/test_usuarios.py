@@ -14,12 +14,13 @@ from tests.conftest import login_admin, auth_headers, ADMIN_EMAIL
 NUEVO_USUARIO = {
     "identificacion": "9876543210",
     "nombre": "Operador Prueba",
+    "nombre_usuario": "operador",
     "email": "operador@refugio.com",
     "password": "Clave-segura-123",
     "es_admin": False,
     "es_mesero": True,
     "es_cajero": False,
-    "sedes_ids": [],
+    "sedes_ids": [1],
 }
 
 
@@ -34,7 +35,7 @@ def crear_usuario(client, payload=None, headers=None):
 def crear_sede(client, codigo="S001"):
     return client.post(
         "/sedes/",
-        json={"codigo": codigo, "nombre": "Sede Prueba"},
+        json={"codigo": codigo, "nombre": "Sede Prueba", "direccion": "Calle Prueba 1"},
         headers=auth_headers(client),
     ).json()
 
@@ -49,6 +50,7 @@ def test_hu07_crear_usuario_exitoso(client):
     assert resp.status_code == 201
     data = resp.json()
     assert data["email"] == NUEVO_USUARIO["email"]
+    assert data["nombre_usuario"] == NUEVO_USUARIO["nombre_usuario"]
     assert data["estado"] is True
     assert "hashed_password" not in data
 
@@ -68,12 +70,62 @@ def test_hu07_identificacion_duplicada_retorna_400(client):
     assert resp.status_code == 400
 
 
+def test_hu07_nombre_usuario_duplicado_no_distingue_mayusculas(client):
+    crear_usuario(client)
+    duplicado = {**NUEVO_USUARIO, "identificacion": "1234567890", "email": "otro@refugio.com", "nombre_usuario": "OPERADOR"}
+    resp = crear_usuario(client, payload=duplicado)
+    assert resp.status_code == 400
+
+
 def test_hu07_sin_rol_retorna_422(client):
     """HU-07: Un usuario sin ningún rol asignado es rechazado."""
     payload = {**NUEVO_USUARIO, "es_admin": False, "es_mesero": False, "es_cajero": False}
     resp = crear_usuario(client, payload=payload)
     assert resp.status_code == 422
     assert "rol" in resp.json()["detail"].lower()
+
+
+def test_hu07_admin_puede_crearse_sin_sede(client):
+    payload = {
+        **NUEVO_USUARIO,
+        "identificacion": "2222222222",
+        "nombre_usuario": "admin-sin-sede",
+        "email": "admin-sin-sede@example.com",
+        "es_admin": True,
+        "es_mesero": False,
+        "es_cajero": False,
+        "sedes_ids": [],
+    }
+
+    response = crear_usuario(client, payload=payload)
+
+    assert response.status_code == 201
+    assert response.json()["sedes_ids"] == []
+
+
+def test_hu07_admin_con_sede_retorna_422(client):
+    """HU-07: El administrador no debe tener sedes asignadas."""
+    sede = crear_sede(client)
+    payload = {
+        **NUEVO_USUARIO,
+        "identificacion": "3333333333",
+        "nombre_usuario": "admin-con-sede",
+        "email": "admin-con-sede@example.com",
+        "es_admin": True,
+        "sedes_ids": [sede["id"]],
+    }
+    resp = crear_usuario(client, payload=payload)
+    assert resp.status_code == 422
+    assert "administrador no debe tener sedes asignadas" in resp.json()["detail"].lower()
+
+
+def test_hu07_usuario_operativo_sin_sede_retorna_422(client):
+    payload = {**NUEVO_USUARIO, "sedes_ids": []}
+
+    response = crear_usuario(client, payload=payload)
+
+    assert response.status_code == 422
+    assert "sede" in response.json()["detail"].lower()
 
 
 def test_hu07_con_sede_valida_asigna_sede(client):
@@ -95,7 +147,8 @@ def test_hu07_con_sede_inexistente_retorna_404(client):
 def test_hu07_sin_ser_admin_retorna_403(client, db_engine):
     """HU-07: Un usuario no-admin no puede registrar usuarios."""
     from sqlalchemy.orm import sessionmaker
-    from app.usuarios.models import Usuario
+    from app.usuarios.models import Usuario, UsuarioSede
+    from app.sedes.models import Sede
     from app.core.security import get_password_hash
 
     Session = sessionmaker(bind=db_engine)
@@ -103,6 +156,7 @@ def test_hu07_sin_ser_admin_retorna_403(client, db_engine):
         mesero = Usuario(
             identificacion="1111111111",
             nombre="Mesero",
+            nombre_usuario="mesero",
             email="mesero@refugio.com",
             hashed_password=get_password_hash("Clave-segura-123"),
             estado=True,
@@ -111,11 +165,14 @@ def test_hu07_sin_ser_admin_retorna_403(client, db_engine):
             es_cajero=False,
         )
         db.add(mesero)
+        db.flush()
+        base_site = db.query(Sede).filter_by(codigo="BASE").one()
+        db.add(UsuarioSede(usuario_id=mesero.id, sede_id=base_site.id))
         db.commit()
 
     token = client.post(
         "/auth/login",
-        json={"email": "mesero@refugio.com", "password": "Clave-segura-123"},
+        json={"identificacion": "1111111111", "password": "Clave-segura-123"},
     ).json()["access_token"]
 
     resp = crear_usuario(client, headers={"Authorization": f"Bearer {token}"})
@@ -146,14 +203,39 @@ def test_hu08_inactivar_usuario(client):
     assert resp.json()["estado"] is False
 
 
-def test_hu08_usuario_inactivo_no_puede_autenticarse(client):
-    """HU-08: Un usuario inactivado no puede hacer login."""
+def test_hu08_reactivar_usuario(client):
     uid = crear_usuario(client).json()["id"]
     client.patch(f"/usuarios/{uid}/inactivar", headers=auth_headers(client))
 
+    response = client.patch(
+        f"/usuarios/{uid}",
+        json={"estado": True},
+        headers=auth_headers(client),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["estado"] is True
+
+
+def test_hu08_usuario_inactivo_no_puede_autenticarse(client, db_engine):
+    """HU-08: Un usuario inactivado no puede hacer login."""
+    uid = crear_usuario(client).json()["id"]
+    token = client.post(
+        "/auth/login",
+        json={"identificacion": NUEVO_USUARIO["identificacion"], "password": NUEVO_USUARIO["password"]},
+    ).json()["access_token"]
+    client.patch(f"/usuarios/{uid}/inactivar", headers=auth_headers(client))
+
+    revoked = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert revoked.status_code == 403
+    from sqlalchemy.orm import sessionmaker
+    from app.auth.models import SesionActiva
+    with sessionmaker(bind=db_engine)() as db:
+        assert db.query(SesionActiva).filter_by(usuario_id=uid).count() == 0
+
     resp = client.post(
         "/auth/login",
-        json={"email": NUEVO_USUARIO["email"], "password": NUEVO_USUARIO["password"]},
+        json={"identificacion": NUEVO_USUARIO["identificacion"], "password": NUEVO_USUARIO["password"]},
     )
     assert resp.status_code == 403
 
@@ -178,13 +260,34 @@ def test_hu08_usuario_inexistente_retorna_404(client):
     assert resp.status_code == 404
 
 
+def test_hu08_actualizar_admin_con_sedes_retorna_422(client):
+    """HU-08: No se pueden asignar sedes a un administrador."""
+    sede = crear_sede(client)
+    payload = {
+        **NUEVO_USUARIO,
+        "identificacion": "4444444444",
+        "nombre_usuario": "admin-update-test",
+        "email": "admin-update@example.com",
+        "es_admin": True,
+        "sedes_ids": [],
+    }
+    uid = crear_usuario(client, payload=payload).json()["id"]
+    resp = client.patch(
+        f"/usuarios/{uid}",
+        json={"sedes_ids": [sede["id"]]},
+        headers=auth_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "administrador no debe tener sedes asignadas" in resp.json()["detail"].lower()
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # HU-09 · Roles adicionales
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_hu09_usuario_con_multiples_roles(client):
     """HU-09: El admin puede asignar combinación Admin+Mesero+Cajero."""
-    payload = {**NUEVO_USUARIO, "es_admin": True, "es_mesero": True, "es_cajero": True}
+    payload = {**NUEVO_USUARIO, "es_admin": True, "es_mesero": True, "es_cajero": True, "sedes_ids": []}
     resp = crear_usuario(client, payload=payload)
     assert resp.status_code == 201
     data = resp.json()
@@ -231,8 +334,8 @@ def test_hu04_usuario_solo_ve_sedes_asignadas(client, db_engine):
     headers = auth_headers(client)
 
     # Crear dos sedes
-    s1 = client.post("/sedes/", json={"codigo": "S001", "nombre": "Norte"}, headers=headers).json()
-    s2 = client.post("/sedes/", json={"codigo": "S002", "nombre": "Sur"}, headers=headers).json()
+    s1 = client.post("/sedes/", json={"codigo": "S001", "nombre": "Norte", "direccion": "Calle Norte 1"}, headers=headers).json()
+    s2 = client.post("/sedes/", json={"codigo": "S002", "nombre": "Sur", "direccion": "Calle Sur 1"}, headers=headers).json()
 
     # Crear mesero asignado solo a S1
     payload = {**NUEVO_USUARIO, "sedes_ids": [s1["id"]]}
@@ -240,7 +343,7 @@ def test_hu04_usuario_solo_ve_sedes_asignadas(client, db_engine):
 
     token = client.post(
         "/auth/login",
-        json={"email": NUEVO_USUARIO["email"], "password": NUEVO_USUARIO["password"]},
+        json={"identificacion": NUEVO_USUARIO["identificacion"], "password": NUEVO_USUARIO["password"]},
     ).json()["access_token"]
     mesero_headers = {"Authorization": f"Bearer {token}"}
 
@@ -256,16 +359,16 @@ def test_hu04_mesero_no_accede_a_mesas_de_sede_no_asignada(client):
     headers = auth_headers(client)
 
     # Crear sede y mesa
-    s1 = client.post("/sedes/", json={"codigo": "S001", "nombre": "Norte"}, headers=headers).json()
+    s1 = client.post("/sedes/", json={"codigo": "S001", "nombre": "Norte", "direccion": "Calle Norte 1"}, headers=headers).json()
     client.post(f"/sedes/{s1['id']}/mesas", json={"numero": 1}, headers=headers)
 
-    # Crear mesero SIN sede asignada
-    payload = {**NUEVO_USUARIO, "sedes_ids": []}
+    # El mesero tiene la sede base, pero no la sede S001
+    payload = {**NUEVO_USUARIO, "sedes_ids": [1]}
     crear_usuario(client, payload=payload)
 
     token = client.post(
         "/auth/login",
-        json={"email": NUEVO_USUARIO["email"], "password": NUEVO_USUARIO["password"]},
+        json={"identificacion": NUEVO_USUARIO["identificacion"], "password": NUEVO_USUARIO["password"]},
     ).json()["access_token"]
     mesero_headers = {"Authorization": f"Bearer {token}"}
 

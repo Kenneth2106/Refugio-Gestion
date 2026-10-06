@@ -54,6 +54,7 @@ def client(db_engine):
         admin = Usuario(
             identificacion="0000000000",
             nombre="Administrador Sistema",
+            nombre_usuario="admin",
             email=ADMIN_EMAIL,
             hashed_password=get_password_hash(ADMIN_PASSWORD),
             estado=True,
@@ -62,6 +63,15 @@ def client(db_engine):
             es_cajero=True,
         )
         db.add(admin)
+        db.flush()
+        db.add(
+            Sede(
+                codigo="BASE",
+                nombre="Base Test Site",
+                direccion="1 Test Street",
+                estado=True,
+            )
+        )
         db.commit()
 
     with TestClient(app) as test_client:
@@ -74,7 +84,7 @@ def login_admin(client) -> dict:
     """Helper: autentica al admin y devuelve el JSON de respuesta."""
     resp = client.post(
         "/auth/login",
-        json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
+        json={"identificacion": "0000000000", "password": ADMIN_PASSWORD},
     )
     assert resp.status_code == 200, resp.text
     return resp.json()

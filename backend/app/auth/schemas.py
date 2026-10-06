@@ -4,13 +4,13 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_va
 class LoginSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    email: EmailStr
+    identificacion: str = Field(min_length=1, max_length=30)
     password: SecretStr = Field(min_length=1, max_length=72)
 
-    @field_validator("email", mode="before")
+    @field_validator("identificacion", mode="before")
     @classmethod
-    def normalize_email(cls, value: object) -> object:
-        return value.strip().lower() if isinstance(value, str) else value
+    def normalize_identification(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
 
     @field_validator("password")
     @classmethod
@@ -24,3 +24,15 @@ class TokenSchema(BaseModel):
     access_token: str
     token_type: str
     redirect_to: str
+
+
+class CurrentUserSchema(BaseModel):
+    id: int
+    identificacion: str
+    nombre: str
+    nombre_usuario: str
+    email: EmailStr
+    roles: list[str]
+    sedes_ids: list[int]
+    is_admin: bool
+    expires_at: int

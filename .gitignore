@@ -11,6 +11,10 @@ __pycache__/
 .vscode/
 .idea/
 
+# Node / Frontend
+node_modules/
+dist/
+
 # OS
 .DS_Store
 Thumbs.db

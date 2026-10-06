@@ -17,6 +17,7 @@ except ValueError as error:
 
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").strip().lower() == "true"
 AUTH_COOKIE_NAME = "refugio_access_token"
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:5175").rstrip("/")
 
 if not DATABASE_URL:
     raise RuntimeError("Configura DATABASE_URL en backend/.env")

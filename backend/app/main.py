@@ -1,29 +1,23 @@
-from pathlib import Path
-
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.auth.router import router as auth_router
-from app.auth.router import SesionAutenticada, get_current_session
-from app.sedes.router import router as sedes_router
-from app.usuarios.router import router as usuarios_router
+from app.auth.models import SesionActiva
 from app.core.database import Base, engine
-
-# Importar todos los modelos para que se creen las tablas
-from app.auth.models import SesionActiva  # noqa: F401
-from app.sedes.models import Sede, Mesa  # noqa: F401
-from app.usuarios.models import Usuario, UsuarioSede  # noqa: F401
+from app.core.settings import FRONTEND_URL
+from app.sedes.models import Mesa, Sede
+from app.sedes.router import router as sedes_router
+from app.usuarios.models import Usuario, UsuarioSede
+from app.usuarios.router import router as usuarios_router
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Sistema Refugio Gestión")
-templates = Jinja2Templates(directory=Path(__file__).resolve().parent / "templates")
 
 app.include_router(auth_router)
-app.include_router(sedes_router)
 app.include_router(usuarios_router)
+app.include_router(sedes_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -45,28 +39,14 @@ async def validation_error_handler(
 
 @app.get("/")
 def home() -> RedirectResponse:
-    return RedirectResponse(url="/login", status_code=303)
+    return RedirectResponse(url=f"{FRONTEND_URL}/login", status_code=303)
 
 
-@app.get("/login", response_class=HTMLResponse)
-def login_page(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={},
-    )
+@app.get("/login")
+def login_page() -> RedirectResponse:
+    return RedirectResponse(url=f"{FRONTEND_URL}/login", status_code=307)
 
 
-@app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(
-    request: Request,
-    session: SesionAutenticada = Depends(get_current_session),
-) -> HTMLResponse:
-    return templates.TemplateResponse(
-        request=request,
-        name="dashboard.html",
-        context={
-            "email": session.usuario.email,
-            "expires_at": session.expires_at,
-        },
-    )
+@app.get("/dashboard")
+def dashboard() -> RedirectResponse:
+    return RedirectResponse(url=f"{FRONTEND_URL}/dashboard", status_code=307)

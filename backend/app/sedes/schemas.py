@@ -19,6 +19,7 @@ class MesaOut(MesaBase):
 class SedeBase(BaseModel):
     codigo: str = Field(min_length=1, max_length=20)
     nombre: str = Field(min_length=1, max_length=100)
+    direccion: str = Field(min_length=1, max_length=200)
     estado: bool = True
 
 class SedeCreate(SedeBase):
@@ -27,6 +28,7 @@ class SedeCreate(SedeBase):
 class SedeUpdate(BaseModel):
     codigo: str | None = Field(None, min_length=1, max_length=20)
     nombre: str | None = Field(None, min_length=1, max_length=100)
+    direccion: str | None = Field(None, min_length=1, max_length=200)
     estado: bool | None = None
 
 class SedeOut(SedeBase):

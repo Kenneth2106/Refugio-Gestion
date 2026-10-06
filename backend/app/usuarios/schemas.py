@@ -6,6 +6,7 @@ class UsuarioCreate(BaseModel):
 
     identificacion: str = Field(min_length=1, max_length=30)
     nombre: str = Field(min_length=1, max_length=100)
+    nombre_usuario: str = Field(min_length=3, max_length=50)
     email: EmailStr
     password: SecretStr = Field(min_length=8, max_length=72)
     es_admin: bool = False
@@ -16,6 +17,11 @@ class UsuarioCreate(BaseModel):
     @field_validator("email", mode="before")
     @classmethod
     def normalize_email(cls, value: object) -> object:
+        return value.strip().lower() if isinstance(value, str) else value
+
+    @field_validator("nombre_usuario", mode="before")
+    @classmethod
+    def normalize_username(cls, value: object) -> object:
         return value.strip().lower() if isinstance(value, str) else value
 
     @field_validator("password")
@@ -30,6 +36,7 @@ class UsuarioUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     nombre: str | None = Field(None, min_length=1, max_length=100)
+    nombre_usuario: str | None = Field(None, min_length=3, max_length=50)
     email: EmailStr | None = None
     password: SecretStr | None = Field(None, min_length=8, max_length=72)
     es_admin: bool | None = None
@@ -43,11 +50,17 @@ class UsuarioUpdate(BaseModel):
     def normalize_email(cls, value: object) -> object:
         return value.strip().lower() if isinstance(value, str) else value
 
+    @field_validator("nombre_usuario", mode="before")
+    @classmethod
+    def normalize_username(cls, value: object) -> object:
+        return value.strip().lower() if isinstance(value, str) else value
+
 
 class UsuarioOut(BaseModel):
     id: int
     identificacion: str
     nombre: str
+    nombre_usuario: str
     email: str
     estado: bool
     es_admin: bool

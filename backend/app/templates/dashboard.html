@@ -74,21 +74,10 @@
       }
     });
 
-    const sessionExpiresAt = {{ expires_at }} * 1000;
-
-    function redirectWhenSessionExpires() {
-      const remainingMilliseconds = sessionExpiresAt - Date.now();
-      if (remainingMilliseconds <= 0) {
-        window.location.replace("/login?expired=1");
-        return;
-      }
-      window.setTimeout(
-        redirectWhenSessionExpires,
-        Math.min(remainingMilliseconds, 2147483647),
-      );
-    }
-
-    redirectWhenSessionExpires();
+    window.setTimeout(
+      () => window.location.replace("/login?expired=1"),
+      Math.min({{ expires_in_seconds }} * 1000, 2147483647),
+    );
 
     // Lógica de inactividad
     let lastActivityTime = Date.now();
@@ -106,7 +95,7 @@
     setInterval(async () => {
       const now = Date.now();
       // Si lleva inactivo 3 minutos (180000 ms), redirigir
-      if (now - lastActivityTime > 3 * 60 * 1000) {
+      if (now - lastActivityTime >= {{ inactivity_timeout_seconds }} * 1000) {
         window.location.replace("/login?inactivity=1");
         return;
       }

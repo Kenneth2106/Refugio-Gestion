@@ -11,10 +11,10 @@ from tests.conftest import login_admin, auth_headers
 # Helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
-def crear_sede(client, codigo="S001", nombre="Sede Norte"):
+def crear_sede(client, codigo="S001", nombre="Sede Norte", direccion="Calle Principal 123"):
     return client.post(
         "/sedes/",
-        json={"codigo": codigo, "nombre": nombre},
+        json={"codigo": codigo, "nombre": nombre, "direccion": direccion},
         headers=auth_headers(client),
     )
 
@@ -30,6 +30,7 @@ def test_hu10_crear_sede_exitosa(client):
     data = resp.json()
     assert data["codigo"] == "S001"
     assert data["nombre"] == "Sede Norte"
+    assert data["direccion"] == "Calle Principal 123"
     assert data["estado"] is True
 
 
@@ -47,7 +48,7 @@ def test_hu10_listar_sedes_retorna_todas(client):
     crear_sede(client, codigo="S002", nombre="Sede Sur")
     resp = client.get("/sedes/", headers=auth_headers(client))
     assert resp.status_code == 200
-    assert len(resp.json()) == 2
+    assert {sede["codigo"] for sede in resp.json()} >= {"S001", "S002"}
 
 
 def test_hu10_inactivar_sede(client):
@@ -62,6 +63,16 @@ def test_hu10_inactivar_sede(client):
     assert resp.json()["estado"] is False
 
 
+def test_hu10_reactivar_sede(client):
+    sede_id = crear_sede(client).json()["id"]
+    client.patch(f"/sedes/{sede_id}", json={"estado": False}, headers=auth_headers(client))
+
+    response = client.patch(f"/sedes/{sede_id}", json={"estado": True}, headers=auth_headers(client))
+
+    assert response.status_code == 200
+    assert response.json()["estado"] is True
+
+
 def test_hu10_sede_no_existente_retorna_404(client):
     """HU-10: Actualizar una sede inexistente devuelve 404."""
     resp = client.patch(
@@ -74,14 +85,15 @@ def test_hu10_sede_no_existente_retorna_404(client):
 
 def test_hu10_sin_autenticacion_retorna_401(client):
     """HU-10: Crear sede sin token es rechazado."""
-    resp = client.post("/sedes/", json={"codigo": "S001", "nombre": "N"})
+    resp = client.post("/sedes/", json={"codigo": "S001", "nombre": "N", "direccion": "Calle 1"})
     assert resp.status_code == 401
 
 
 def test_hu10_sin_ser_admin_retorna_403(client, db_engine):
     """HU-10: Un usuario sin rol admin no puede crear sedes."""
     from sqlalchemy.orm import sessionmaker
-    from app.usuarios.models import Usuario
+    from app.usuarios.models import Usuario, UsuarioSede
+    from app.sedes.models import Sede
     from app.core.security import get_password_hash
 
     Session = sessionmaker(bind=db_engine)
@@ -89,6 +101,7 @@ def test_hu10_sin_ser_admin_retorna_403(client, db_engine):
         mesero = Usuario(
             identificacion="1111111111",
             nombre="Mesero Prueba",
+            nombre_usuario="mesero",
             email="mesero@refugio.com",
             hashed_password=get_password_hash("Clave-segura-123"),
             estado=True,
@@ -97,16 +110,19 @@ def test_hu10_sin_ser_admin_retorna_403(client, db_engine):
             es_cajero=False,
         )
         db.add(mesero)
+        db.flush()
+        base_site = db.query(Sede).filter_by(codigo="BASE").one()
+        db.add(UsuarioSede(usuario_id=mesero.id, sede_id=base_site.id))
         db.commit()
 
     token = client.post(
         "/auth/login",
-        json={"email": "mesero@refugio.com", "password": "Clave-segura-123"},
+        json={"identificacion": "1111111111", "password": "Clave-segura-123"},
     ).json()["access_token"]
 
     resp = client.post(
         "/sedes/",
-        json={"codigo": "S001", "nombre": "Sede"},
+        json={"codigo": "S001", "nombre": "Sede", "direccion": "Calle 1"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 403
@@ -163,6 +179,19 @@ def test_hu35_inactivar_mesa(client):
     assert resp.json()["estado"] is False
 
 
+def test_hu35_reactivar_mesa(client):
+    sede_id = crear_sede(client).json()["id"]
+    mesa_id = client.post(
+        f"/sedes/{sede_id}/mesas", json={"numero": 1}, headers=auth_headers(client)
+    ).json()["id"]
+    client.patch(f"/sedes/mesas/{mesa_id}", json={"estado": False}, headers=auth_headers(client))
+
+    response = client.patch(f"/sedes/mesas/{mesa_id}", json={"estado": True}, headers=auth_headers(client))
+
+    assert response.status_code == 200
+    assert response.json()["estado"] is True
+
+
 def test_hu35_listar_mesas_de_sede(client):
     """HU-35: El admin puede listar las mesas de una sede."""
     sede_id = crear_sede(client).json()["id"]
@@ -197,6 +226,15 @@ def test_hu05_sede_sin_codigo_retorna_422(client):
 def test_hu05_sede_sin_nombre_retorna_422(client):
     """HU-05: Crear sede sin campo obligatorio 'nombre' devuelve 422."""
     resp = client.post("/sedes/", json={"codigo": "S001"}, headers=auth_headers(client))
+    assert resp.status_code == 422
+
+
+def test_hu10_sede_sin_direccion_retorna_422(client):
+    resp = client.post(
+        "/sedes/",
+        json={"codigo": "S001", "nombre": "Sin dirección"},
+        headers=auth_headers(client),
+    )
     assert resp.status_code == 422
 
 

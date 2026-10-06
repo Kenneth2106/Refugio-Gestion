@@ -8,7 +8,7 @@ from jose import JWTError
 from sqlalchemy.orm import Session
 
 from app.auth.models import SesionActiva
-from app.auth.schemas import LoginSchema, TokenSchema
+from app.auth.schemas import CurrentUserSchema, LoginSchema, TokenSchema
 from app.core.database import get_db
 from app.core.security import create_access_token, decode_access_token, verify_password
 from app.core.settings import (
@@ -17,7 +17,8 @@ from app.core.settings import (
     AUTH_COOKIE_NAME,
     COOKIE_SECURE,
 )
-from app.usuarios.models import Usuario
+from app.usuarios.models import Usuario, UsuarioSede
+from app.sedes.models import Sede
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -36,6 +37,22 @@ class SesionAutenticada:
     usuario: Usuario
     jti: str
     expires_at: int
+
+
+def as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def has_active_site(db: Session, usuario_id: int) -> bool:
+    return (
+        db.query(UsuarioSede.usuario_id)
+        .join(Sede, Sede.id == UsuarioSede.sede_id)
+        .filter(UsuarioSede.usuario_id == usuario_id, Sede.estado.is_(True))
+        .first()
+        is not None
+    )
 
 
 def get_current_session(
@@ -69,12 +86,17 @@ def get_current_session(
         raise unauthorized()
 
     usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
-    if usuario is None or usuario.email != subject:
+    if usuario is None or usuario.identificacion != subject:
         raise unauthorized()
     if not usuario.estado:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuario inactivado",
+        )
+    if not usuario.es_admin and not has_active_site(db, usuario.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El usuario no tiene una sede activa asignada",
         )
 
     sesion = (
@@ -86,17 +108,7 @@ def get_current_session(
         raise unauthorized()
 
     now = datetime.now(timezone.utc)
-
-    def _to_utc_naive(dt: datetime) -> datetime:
-        """Devuelve el datetime como UTC naive para comparaciones consistentes."""
-        if dt.tzinfo is not None:
-            return dt.astimezone(timezone.utc).replace(tzinfo=None)
-        return dt
-
-    now_naive = _to_utc_naive(now)
-
-    # Validar inactividad
-    if now_naive - _to_utc_naive(sesion.ultima_actividad) > timedelta(minutes=SESSION_INACTIVITY_MINUTES):
+    if now - as_utc(sesion.ultima_actividad) >= timedelta(minutes=SESSION_INACTIVITY_MINUTES):
         db.delete(sesion)
         db.commit()
         raise HTTPException(
@@ -104,9 +116,7 @@ def get_current_session(
             detail="Sesión cerrada por inactividad",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    # Validar tiempo máximo
-    if now_naive - _to_utc_naive(sesion.creada_en) > timedelta(minutes=SESSION_MAX_MINUTES):
+    if now - as_utc(sesion.creada_en) >= timedelta(minutes=SESSION_MAX_MINUTES):
         db.delete(sesion)
         db.commit()
         raise HTTPException(
@@ -117,7 +127,6 @@ def get_current_session(
 
     sesion.ultima_actividad = now
     db.commit()
-
     return SesionAutenticada(usuario=usuario, jti=jti, expires_at=expires_at)
 
 
@@ -126,9 +135,37 @@ def get_current_user(
 ) -> Usuario:
     return session.usuario
 
-def require_admin(usuario: Usuario = Depends(get_current_user)) -> Usuario:
+
+def require_admin(
+    usuario: Usuario = Depends(get_current_user),
+) -> Usuario:
     if not usuario.es_admin:
-        raise HTTPException(status_code=403, detail="Requiere privilegios de administrador")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren privilegios de administrador",
+        )
+    return usuario
+
+
+def require_mesero(
+    usuario: Usuario = Depends(get_current_user),
+) -> Usuario:
+    if not (usuario.es_admin or usuario.es_mesero):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren permisos de mesero",
+        )
+    return usuario
+
+
+def require_cajero(
+    usuario: Usuario = Depends(get_current_user),
+) -> Usuario:
+    if not (usuario.es_admin or usuario.es_cajero):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren permisos de cajero",
+        )
     return usuario
 
 
@@ -140,7 +177,7 @@ def login(
 ) -> dict[str, str]:
     usuario = (
         db.query(Usuario)
-        .filter(Usuario.email == str(credentials.email))
+        .filter(Usuario.identificacion == credentials.identificacion)
         .with_for_update()
         .first()
     )
@@ -150,7 +187,7 @@ def login(
     ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Correo o contraseña incorrectos",
+            detail="Identificación o contraseña incorrectas",
             headers={"WWW-Authenticate": "Bearer"},
         )
     if not usuario.estado:
@@ -158,18 +195,45 @@ def login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuario inactivado",
         )
+    if not usuario.es_admin and not has_active_site(db, usuario.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El usuario no tiene una sede activa asignada",
+        )
 
     jti = secrets.token_urlsafe(32)
     expires_delta = timedelta(minutes=SESSION_MAX_MINUTES)
+    roles = ["admin"] if usuario.es_admin else []
+    if usuario.es_admin or usuario.es_mesero:
+        roles.append("mesero")
+    if usuario.es_admin or usuario.es_cajero:
+        roles.append("cajero")
+    if usuario.es_admin:
+        sedes_ids = [row[0] for row in db.query(Sede.id).filter(Sede.estado.is_(True)).all()]
+    else:
+        sedes_ids = [assignment.sede_id for assignment in usuario.sedes]
     access_token = create_access_token(
-        data={"sub": usuario.email, "user_id": usuario.id, "jti": jti},
+        data={
+            "sub": usuario.identificacion,
+            "user_id": usuario.id,
+            "jti": jti,
+            "roles": roles,
+            "sedes_ids": sedes_ids,
+        },
         expires_delta=expires_delta,
     )
 
     sesion = db.query(SesionActiva).filter_by(usuario_id=usuario.id).first()
     now = datetime.now(timezone.utc)
     if sesion is None:
-        db.add(SesionActiva(usuario_id=usuario.id, jti=jti, creada_en=now, ultima_actividad=now))
+        db.add(
+            SesionActiva(
+                usuario_id=usuario.id,
+                jti=jti,
+                creada_en=now,
+                ultima_actividad=now,
+            )
+        )
     else:
         sesion.jti = jti
         sesion.creada_en = now
@@ -189,6 +253,34 @@ def login(
         "access_token": access_token,
         "token_type": "bearer",
         "redirect_to": "/dashboard",
+    }
+
+
+@router.get("/me", response_model=CurrentUserSchema)
+def current_user(
+    session: SesionAutenticada = Depends(get_current_session),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    usuario = session.usuario
+    roles = ["admin"] if usuario.es_admin else []
+    if usuario.es_admin or usuario.es_mesero:
+        roles.append("mesero")
+    if usuario.es_admin or usuario.es_cajero:
+        roles.append("cajero")
+    if usuario.es_admin:
+        sedes_ids = [row[0] for row in db.query(Sede.id).filter(Sede.estado.is_(True)).all()]
+    else:
+        sedes_ids = [assignment.sede_id for assignment in usuario.sedes]
+    return {
+        "id": usuario.id,
+        "identificacion": usuario.identificacion,
+        "nombre": usuario.nombre,
+        "nombre_usuario": usuario.nombre_usuario,
+        "email": usuario.email,
+        "roles": roles,
+        "sedes_ids": sedes_ids,
+        "is_admin": usuario.es_admin,
+        "expires_at": session.expires_at,
     }
 
 
@@ -215,6 +307,6 @@ def logout(
 
 @router.post("/ping")
 def ping(
-    session: SesionAutenticada = Depends(get_current_session)
+    session: SesionAutenticada = Depends(get_current_session),
 ) -> dict[str, str]:
     return {"message": "pong"}

@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_db
 from app.core.security import get_password_hash
+from app.auth.models import SesionActiva
 from app.auth.router import require_admin
 from app.usuarios.models import Usuario, UsuarioSede
 from app.sedes.models import Sede
@@ -17,11 +18,12 @@ def _build_out(usuario: Usuario) -> UsuarioOut:
         id=usuario.id,
         identificacion=usuario.identificacion,
         nombre=usuario.nombre,
+        nombre_usuario=usuario.nombre_usuario,
         email=usuario.email,
         estado=usuario.estado,
         es_admin=usuario.es_admin,
-        es_mesero=usuario.es_mesero,
-        es_cajero=usuario.es_cajero,
+        es_mesero=usuario.es_mesero or usuario.es_admin,
+        es_cajero=usuario.es_cajero or usuario.es_admin,
         sedes_ids=[us.sede_id for us in usuario.sedes],
     )
 
@@ -38,6 +40,16 @@ def crear_usuario(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="El usuario debe tener al menos un rol asignado",
         )
+    if not usuario_in.es_admin and not usuario_in.sedes_ids:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Los usuarios operativos deben tener al menos una sede asignada",
+        )
+    if usuario_in.es_admin and usuario_in.sedes_ids:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="El administrador no debe tener sedes asignadas ya que gestiona todas las sedes",
+        )
 
     # Validar existencia de sedes
     for sede_id in usuario_in.sedes_ids:
@@ -48,6 +60,7 @@ def crear_usuario(
     nuevo = Usuario(
         identificacion=usuario_in.identificacion,
         nombre=usuario_in.nombre,
+        nombre_usuario=usuario_in.nombre_usuario.strip().lower(),
         email=str(usuario_in.email),
         hashed_password=get_password_hash(usuario_in.password.get_secret_value()),
         estado=True,
@@ -62,7 +75,7 @@ def crear_usuario(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El correo o la identificación ya están registrados",
+            detail="El correo, nombre de usuario o identificación ya están registrados",
         )
 
     for sede_id in usuario_in.sedes_ids:
@@ -104,14 +117,32 @@ def actualizar_usuario(
     usuario_id: int,
     usuario_in: UsuarioUpdate,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(require_admin),
+    admin: Usuario = Depends(require_admin),
 ):
     usuario = db.query(Usuario).options(joinedload(Usuario.sedes)).filter(Usuario.id == usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     update_data = usuario_in.model_dump(exclude_unset=True)
+    if usuario.id == admin.id and update_data.get("estado") is False:
+        raise HTTPException(status_code=400, detail="No puedes inactivarte a ti mismo")
     sedes_ids = update_data.pop("sedes_ids", None)
+    resulting_is_admin = update_data.get("es_admin", usuario.es_admin)
+    resulting_roles = (
+        update_data.get("es_mesero", usuario.es_mesero),
+        update_data.get("es_cajero", usuario.es_cajero),
+    )
+    resulting_site_ids = sedes_ids if sedes_ids is not None else [assignment.sede_id for assignment in usuario.sedes]
+    if not resulting_is_admin and any(resulting_roles) and not resulting_site_ids:
+        raise HTTPException(
+            status_code=422,
+            detail="Los usuarios operativos deben tener al menos una sede asignada",
+        )
+    if resulting_is_admin and sedes_ids is not None and len(sedes_ids) > 0:
+        raise HTTPException(
+            status_code=422,
+            detail="El administrador no debe tener sedes asignadas ya que gestiona todas las sedes",
+        )
     password = update_data.pop("password", None)
 
     if password is not None:
@@ -127,7 +158,9 @@ def actualizar_usuario(
             detail="El usuario debe tener al menos un rol asignado",
         )
 
-    if sedes_ids is not None:
+    if resulting_is_admin:
+        db.query(UsuarioSede).filter(UsuarioSede.usuario_id == usuario_id).delete()
+    elif sedes_ids is not None:
         # Validar sedes
         for sede_id in sedes_ids:
             sede = db.query(Sede).filter(Sede.id == sede_id, Sede.estado == True).first()
@@ -138,12 +171,15 @@ def actualizar_usuario(
         for sede_id in sedes_ids:
             db.add(UsuarioSede(usuario_id=usuario_id, sede_id=sede_id))
 
+    if not usuario.estado:
+        db.query(SesionActiva).filter_by(usuario_id=usuario.id).delete(synchronize_session=False)
+
     try:
         db.commit()
         db.refresh(usuario)
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=400, detail="El correo ya está registrado")
+        raise HTTPException(status_code=400, detail="El correo o nombre de usuario ya están registrados")
 
     return _build_out(usuario)
 
@@ -162,6 +198,7 @@ def inactivar_usuario(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     usuario.estado = False
+    db.query(SesionActiva).filter_by(usuario_id=usuario.id).delete(synchronize_session=False)
     db.commit()
     db.refresh(usuario)
     return _build_out(usuario)
