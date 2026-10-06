@@ -203,7 +203,8 @@ function shell(content) {
   return `<div class="app-shell">
     <header class="topbar">
       <a class="brand-lockup" href="/dashboard" data-nav="/dashboard">
-        <span class="brand-mark" aria-hidden="true">R</span><span>Refugio Management</span>
+        <img class="brand-logo-small" src="/brand-logo.svg" alt="El Refugio Bar">
+        <span>Refugio Management</span>
       </a>
       <div class="topbar-right">${siteSelector()}
         <div class="account-actions">
@@ -487,7 +488,7 @@ async function renderLogin() {
   const reasonMarkup = reason ? `<p class="notice" role="status">${escapeHtml(reason)}</p>` : ""
   return `<main class="login-shell">
     <section class="login-brand">
-      <div class="brand-mark" aria-hidden="true">R</div>
+      <img class="login-logo" src="/brand-logo.svg" alt="El Refugio Bar">
       <div><p class="page-kicker">Refugio Bar</p><h1>Refugio Management</h1>
         <p>Secure access for the people who keep the business moving.</p></div>
       <small>Protected workspace</small>

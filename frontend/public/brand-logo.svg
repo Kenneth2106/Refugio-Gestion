@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title">
+  <title id="title">El Refugio Bar</title>
+  <circle cx="120" cy="120" r="113" fill="#090807"/>
+  <circle cx="120" cy="120" r="106" fill="none" stroke="#c9a65a" stroke-width="1.5"/>
+  <circle cx="120" cy="120" r="99" fill="none" stroke="#8c713d" stroke-width="0.8"/>
+  <path d="M97 31h46l-6 7-13 23a11 11 0 0 1-8 5 11 11 0 0 1-8-5L95 38z" fill="none" stroke="#d5b66d" stroke-width="2"/>
+  <path d="M101 39h38l-12 19a7 7 0 0 1-7 4 7 7 0 0 1-7-4z" fill="#c9a65a"/>
+  <path d="M120 66v17m-17 0h34" fill="none" stroke="#d5b66d" stroke-width="2"/>
+  <path d="M83 88h74" stroke="#8c713d" stroke-width="1"/>
+  <text x="120" y="105" fill="#e6d5aa" font-family="Georgia,serif" font-size="11" letter-spacing="5" text-anchor="middle">EL</text>
+  <text x="120" y="139" fill="#f4ead2" font-family="Georgia,'Times New Roman',serif" font-size="34" font-weight="bold" letter-spacing="1.1" text-anchor="middle">REFUGIO</text>
+  <text x="120" y="162" fill="#d5b66d" font-family="Georgia,serif" font-size="15" letter-spacing="6" text-anchor="middle">BAR</text>
+  <path d="M71 173h98" stroke="#8c713d" stroke-width="1"/>
+  <text x="120" y="188" fill="#d8c99f" font-family="Georgia,serif" font-size="6.5" letter-spacing="1.6" text-anchor="middle">BUENOS MOMENTOS</text>
+  <text x="120" y="198" fill="#d8c99f" font-family="Georgia,serif" font-size="6.5" letter-spacing="1.6" text-anchor="middle">SE VIVEN AQUÍ</text>
+  <path d="m91 211 4-4 4 4-4 4zm25 0 4-4 4 4-4 4zm25 0 4-4 4 4-4 4z" fill="#c9a65a"/>
+</svg>
