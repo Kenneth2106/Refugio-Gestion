@@ -231,13 +231,65 @@ def test_hu08_usuario_inactivo_no_puede_autenticarse(client, db_engine):
     from sqlalchemy.orm import sessionmaker
     from app.auth.models import SesionActiva
     with sessionmaker(bind=db_engine)() as db:
-        assert db.query(SesionActiva).filter_by(usuario_id=uid).count() == 0
+        revoked_session = db.query(SesionActiva).filter_by(usuario_id=uid).one()
+        assert revoked_session.activa is False
+        assert revoked_session.revocada_en is not None
 
     resp = client.post(
         "/auth/login",
         json={"identificacion": NUEVO_USUARIO["identificacion"], "password": NUEVO_USUARIO["password"]},
     )
     assert resp.status_code == 403
+
+
+def test_hu36_password_persisted_as_bcrypt_hash(client, db_engine):
+    from sqlalchemy.orm import sessionmaker
+    from app.core.security import verify_password
+    from app.usuarios.models import Usuario
+
+    created = crear_usuario(client)
+    assert created.status_code == 201
+    with sessionmaker(bind=db_engine)() as db:
+        usuario = db.query(Usuario).filter_by(id=created.json()["id"]).one()
+        assert usuario.hashed_password.startswith("$2")
+        assert usuario.hashed_password != NUEVO_USUARIO["password"]
+        assert verify_password(NUEVO_USUARIO["password"], usuario.hashed_password)
+
+
+def test_hu08_role_and_site_edits_apply_on_existing_session(client):
+    site_b = crear_sede(client, codigo="S002")
+    user_payload = {
+        **NUEVO_USUARIO,
+        "identificacion": "1234432112",
+        "nombre_usuario": "usuario-dinamico",
+        "email": "usuario-dinamico@refugio.com",
+        "sedes_ids": [1],
+    }
+    user = crear_usuario(client, payload=user_payload).json()
+    token = client.post(
+        "/auth/login",
+        json={
+            "identificacion": user_payload["identificacion"],
+            "password": user_payload["password"],
+        },
+    ).json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    before = client.get("/sedes/1/mesas", headers=headers)
+    changed = client.patch(
+        f"/usuarios/{user['id']}",
+        json={
+            "sedes_ids": [site_b["id"]],
+            "es_mesero": False,
+            "es_cajero": True,
+        },
+        headers=auth_headers(client),
+    )
+    after = client.get("/sedes/1/mesas", headers=headers)
+
+    assert before.status_code == 200
+    assert changed.status_code == 200
+    assert after.status_code == 403
 
 
 def test_hu08_admin_no_puede_inactivarse_a_si_mismo(client, db_engine):
@@ -294,6 +346,39 @@ def test_hu09_usuario_con_multiples_roles(client):
     assert data["es_admin"] is True
     assert data["es_mesero"] is True
     assert data["es_cajero"] is True
+
+
+def test_hu09_roles_adicionales_son_solo_para_administrador(client):
+    non_admin = crear_usuario(
+        client,
+        payload={
+            **NUEVO_USUARIO,
+            "identificacion": "9999911111",
+            "nombre_usuario": "mesero-cajero",
+            "email": "mesero-cajero@refugio.com",
+            "es_mesero": True,
+            "es_cajero": True,
+            "sedes_ids": [1],
+        },
+    )
+    admin = crear_usuario(
+        client,
+        payload={
+            **NUEVO_USUARIO,
+            "identificacion": "9999922222",
+            "nombre_usuario": "admin-capacidades",
+            "email": "admin-capacidades@refugio.com",
+            "es_admin": True,
+            "es_mesero": False,
+            "es_cajero": False,
+            "sedes_ids": [],
+        },
+    )
+
+    assert non_admin.status_code == 422
+    assert admin.status_code == 201
+    assert admin.json()["es_mesero"] is True
+    assert admin.json()["es_cajero"] is True
 
 
 def test_hu09_cambiar_roles_usuario(client):
@@ -380,11 +465,12 @@ def test_hu04_mesero_no_accede_a_mesas_de_sede_no_asignada(client):
 # HU-05 · Validación de campos en usuarios
 # ──────────────────────────────────────────────────────────────────────────────
 
-def test_hu05_usuario_sin_email_retorna_422(client):
-    """HU-05: El campo email es obligatorio."""
+def test_hu07_usuario_sin_email_es_valido(client):
+    """HU-07 no declara el correo como campo obligatorio."""
     payload = {k: v for k, v in NUEVO_USUARIO.items() if k != "email"}
     resp = crear_usuario(client, payload=payload)
-    assert resp.status_code == 422
+    assert resp.status_code == 201
+    assert resp.json()["email"] is None
 
 
 def test_hu05_usuario_email_invalido_retorna_422(client):

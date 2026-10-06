@@ -31,8 +31,15 @@ class CurrentUserSchema(BaseModel):
     identificacion: str
     nombre: str
     nombre_usuario: str
-    email: EmailStr
+    email: EmailStr | None
     roles: list[str]
     sedes_ids: list[int]
     is_admin: bool
     expires_at: int
+    sede_seleccionada_id: int | None = None
+
+
+class SiteSelectionSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sede_id: int = Field(gt=0)

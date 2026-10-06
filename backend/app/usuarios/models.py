@@ -21,7 +21,7 @@ class Usuario(Base):
     identificacion = Column(String, unique=True, nullable=False, index=True)
     nombre = Column(String, nullable=False)
     nombre_usuario = Column(String(50), unique=True, nullable=False, index=True)
-    email = Column(String, unique=True, nullable=False, index=True)
+    email = Column(String, unique=True, nullable=True, index=True)
     hashed_password = Column(String, nullable=False)
     estado = Column(Boolean, default=True, nullable=False)
 

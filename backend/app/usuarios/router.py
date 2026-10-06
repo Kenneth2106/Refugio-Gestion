@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
 
+from app.core.clock import get_utc_now
 from app.core.database import get_db
 from app.core.security import get_password_hash
 from app.auth.models import SesionActiva
@@ -40,6 +41,15 @@ def crear_usuario(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="El usuario debe tener al menos un rol asignado",
         )
+    if (
+        not usuario_in.es_admin
+        and usuario_in.es_mesero
+        and usuario_in.es_cajero
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Los roles adicionales están reservados para el administrador",
+        )
     if not usuario_in.es_admin and not usuario_in.sedes_ids:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -61,12 +71,12 @@ def crear_usuario(
         identificacion=usuario_in.identificacion,
         nombre=usuario_in.nombre,
         nombre_usuario=usuario_in.nombre_usuario.strip().lower(),
-        email=str(usuario_in.email),
+        email=str(usuario_in.email) if usuario_in.email is not None else None,
         hashed_password=get_password_hash(usuario_in.password.get_secret_value()),
         estado=True,
         es_admin=usuario_in.es_admin,
-        es_mesero=usuario_in.es_mesero,
-        es_cajero=usuario_in.es_cajero,
+        es_mesero=usuario_in.es_mesero or usuario_in.es_admin,
+        es_cajero=usuario_in.es_cajero or usuario_in.es_admin,
     )
     db.add(nuevo)
     try:
@@ -132,6 +142,15 @@ def actualizar_usuario(
         update_data.get("es_mesero", usuario.es_mesero),
         update_data.get("es_cajero", usuario.es_cajero),
     )
+    if resulting_is_admin:
+        update_data["es_mesero"] = True
+        update_data["es_cajero"] = True
+        resulting_roles = (True, True)
+    elif all(resulting_roles):
+        raise HTTPException(
+            status_code=422,
+            detail="Los roles adicionales están reservados para el administrador",
+        )
     resulting_site_ids = sedes_ids if sedes_ids is not None else [assignment.sede_id for assignment in usuario.sedes]
     if not resulting_is_admin and any(resulting_roles) and not resulting_site_ids:
         raise HTTPException(
@@ -172,7 +191,17 @@ def actualizar_usuario(
             db.add(UsuarioSede(usuario_id=usuario_id, sede_id=sede_id))
 
     if not usuario.estado:
-        db.query(SesionActiva).filter_by(usuario_id=usuario.id).delete(synchronize_session=False)
+        now = get_utc_now()
+        db.query(SesionActiva).filter(
+            SesionActiva.usuario_id == usuario.id,
+            SesionActiva.activa.is_(True),
+        ).update(
+            {
+                SesionActiva.activa: False,
+                SesionActiva.revocada_en: now,
+            },
+            synchronize_session=False,
+        )
 
     try:
         db.commit()
@@ -198,7 +227,13 @@ def inactivar_usuario(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     usuario.estado = False
-    db.query(SesionActiva).filter_by(usuario_id=usuario.id).delete(synchronize_session=False)
+    active_sessions = db.query(SesionActiva).filter(
+        SesionActiva.usuario_id == usuario.id,
+        SesionActiva.activa.is_(True),
+    )
+    for session in active_sessions:
+        session.activa = False
+        session.revocada_en = get_utc_now()
     db.commit()
     db.refresh(usuario)
     return _build_out(usuario)

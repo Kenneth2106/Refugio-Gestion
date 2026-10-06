@@ -2,10 +2,13 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import sessionmaker
 
+from app.core.clock import get_utc_now
 from app.auth.models import SesionActiva
 from app.auth.router import require_cajero, require_mesero
+from app.auth.router import user_roles
 from app.core.security import create_access_token, decode_access_token, verify_password
 from app.usuarios.models import Usuario
+from app.main import app
 
 
 def login(client, password="Clave-segura-123"):
@@ -15,7 +18,7 @@ def login(client, password="Clave-segura-123"):
     )
 
 
-def test_login_redirects_to_protected_dashboard(client):
+def test_hu01_login_redirects_to_protected_dashboard(client):
     response = login(client)
 
     assert response.status_code == 200
@@ -27,7 +30,7 @@ def test_login_redirects_to_protected_dashboard(client):
     assert current_user.json()["identificacion"] == "0000000000"
 
 
-def test_admin_session_exposes_roles_and_all_sites_to_react(client):
+def test_hu01_admin_session_exposes_roles_and_all_sites(client):
     assert login(client).status_code == 200
 
     current_user = client.get("/auth/me")
@@ -38,7 +41,7 @@ def test_admin_session_exposes_roles_and_all_sites_to_react(client):
     assert current_user.json()["sedes_ids"]
 
 
-def test_admin_always_receives_mesero_and_cajero_jwt_roles(client, db_engine):
+def test_hu09_admin_always_receives_mesero_and_cajero_roles(client, db_engine):
     testing_session = sessionmaker(autoflush=False, bind=db_engine)
     with testing_session() as db:
         admin = db.query(Usuario).filter_by(identificacion="0000000000").one()
@@ -55,7 +58,7 @@ def test_admin_always_receives_mesero_and_cajero_jwt_roles(client, db_engine):
     assert set(roles) == {"admin", "mesero", "cajero"}
 
 
-def test_new_login_invalidates_previous_token(client):
+def test_hu03_new_login_invalidates_previous_token(client):
     first_token = login(client).json()["access_token"]
     second_token = login(client).json()["access_token"]
 
@@ -72,16 +75,32 @@ def test_new_login_invalidates_previous_token(client):
     assert new_session.status_code == 200
 
 
-def test_logout_revokes_session_and_clears_cookie(client):
+def test_hu03_previous_session_row_is_revoked_in_database(client, db_engine):
+    first = login(client).json()["access_token"]
+    first_jti = decode_access_token(first)["jti"]
+    login(client)
+
+    testing_session = sessionmaker(autoflush=False, bind=db_engine)
+    with testing_session() as db:
+        previous = db.query(SesionActiva).filter_by(jti=first_jti).one()
+        assert previous.activa is False
+        assert previous.revocada_en is not None
+
+
+def test_hu06_logout_revokes_session_and_clears_cookie(client, db_engine):
     assert login(client).status_code == 200
 
     response = client.post("/auth/logout")
 
     assert response.status_code == 200
     assert client.get("/auth/me").status_code == 401
+    with sessionmaker(autoflush=False, bind=db_engine)() as db:
+        ended = db.query(SesionActiva).one()
+        assert ended.activa is False
+        assert ended.revocada_en is not None
 
 
-def test_expired_token_is_rejected(client):
+def test_hu34_expired_token_is_rejected(client):
     expired_token = create_access_token(
         {
             "sub": "0000000000",
@@ -99,7 +118,7 @@ def test_expired_token_is_rejected(client):
     assert response.status_code == 401
 
 
-def test_invalid_inputs_and_credentials_are_rejected(client):
+def test_hu01_hu37_invalid_inputs_and_credentials_are_rejected(client):
     invalid_identification = client.post(
         "/auth/login",
         json={"identificacion": "' OR 1=1 --", "password": "anything"},
@@ -119,11 +138,28 @@ def test_invalid_inputs_and_credentials_are_rejected(client):
     assert invalid_identification.json()["detail"] == invalid_password.json()["detail"]
 
 
-def test_corrupted_password_hash_is_treated_as_invalid_credentials():
+def test_hu01_usuario_inexistente_y_clave_erronea_comparten_mensaje(client):
+    nonexistent_user = client.post(
+        "/auth/login",
+        json={"identificacion": "9999999999", "password": "Clave-segura-123"},
+    )
+    incorrect_password = client.post(
+        "/auth/login",
+        json={"identificacion": "0000000000", "password": "clave-incorrecta"},
+    )
+
+    assert nonexistent_user.status_code == incorrect_password.status_code == 401
+    assert nonexistent_user.json()["detail"] == (
+        "Identificación o contraseña incorrectas"
+    )
+    assert nonexistent_user.json()["detail"] == incorrect_password.json()["detail"]
+
+
+def test_hu36_corrupted_password_hash_is_treated_as_invalid_credentials():
     assert verify_password("any-password", "not-a-bcrypt-hash") is False
 
 
-def test_activity_ping_succeeds_for_authenticated_session(client):
+def test_hu02_activity_ping_succeeds_for_authenticated_session(client):
     assert login(client).status_code == 200
 
     response = client.post("/auth/ping")
@@ -132,7 +168,7 @@ def test_activity_ping_succeeds_for_authenticated_session(client):
     assert response.json() == {"message": "pong"}
 
 
-def test_inactivity_expires_session_on_backend(client, db_engine):
+def test_hu02_inactivity_expires_session_on_backend(client, db_engine):
     assert login(client).status_code == 200
     testing_session = sessionmaker(autoflush=False, bind=db_engine)
     with testing_session() as db:
@@ -146,7 +182,7 @@ def test_inactivity_expires_session_on_backend(client, db_engine):
     assert response.json()["detail"] == "Sesión cerrada por inactividad"
 
 
-def test_maximum_session_duration_expires_despite_activity(client, db_engine):
+def test_hu02_maximum_session_duration_expires_despite_activity(client, db_engine):
     assert login(client).status_code == 200
     testing_session = sessionmaker(autoflush=False, bind=db_engine)
     with testing_session() as db:
@@ -159,3 +195,26 @@ def test_maximum_session_duration_expires_despite_activity(client, db_engine):
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Sesión expirada"
+
+
+def test_hu34_login_token_expires_after_inactivity_window(client):
+    initial_time = datetime.now(timezone.utc).replace(microsecond=0)
+    current_time = [initial_time]
+    app.dependency_overrides[get_utc_now] = lambda: current_time[0]
+    try:
+        response = login(client)
+        first_token = response.json()["access_token"]
+        first_payload = decode_access_token(first_token)
+        assert first_payload["exp"] - first_payload["iat"] == 180
+
+        current_time[0] = initial_time + timedelta(minutes=2)
+        ping = client.post("/auth/ping")
+        refreshed_token = ping.cookies.get("refugio_access_token")
+        assert ping.status_code == 200
+        assert refreshed_token is not None
+        refreshed = decode_access_token(refreshed_token)
+        assert refreshed["jti"] == first_payload["jti"]
+        assert refreshed["exp"] - refreshed["iat"] == 180
+        assert refreshed["exp"] > first_payload["exp"]
+    finally:
+        app.dependency_overrides.pop(get_utc_now, None)

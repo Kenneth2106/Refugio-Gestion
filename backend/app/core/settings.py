@@ -1,29 +1,64 @@
-import os
+from functools import lru_cache
 from pathlib import Path
 
-from dotenv import load_dotenv
+from pydantic import Field, SecretStr, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
-SECRET_KEY = os.getenv("SECRET_KEY", "")
-ALGORITHM = "HS256"
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parents[2] / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
-try:
-    SESSION_INACTIVITY_MINUTES = int(os.getenv("SESSION_INACTIVITY_MINUTES", "3"))
-    SESSION_MAX_MINUTES = int(os.getenv("SESSION_MAX_MINUTES", "30"))
-except ValueError as error:
-    raise RuntimeError("Tiempos de sesión deben ser enteros positivos") from error
+    database_url: str = Field(alias="DATABASE_URL", min_length=1)
+    secret_key: SecretStr = Field(alias="SECRET_KEY")
+    algorithm: str = "HS256"
+    session_inactivity_minutes: int = Field(
+        default=3, alias="SESSION_INACTIVITY_MINUTES", gt=0
+    )
+    session_max_minutes: int = Field(
+        default=30, alias="SESSION_MAX_MINUTES", gt=0
+    )
+    cookie_secure: bool = Field(default=True, alias="COOKIE_SECURE")
+    auth_cookie_name: str = "refugio_access_token"
+    frontend_url: str = Field(
+        default="http://127.0.0.1:5175", alias="FRONTEND_URL"
+    )
 
-COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").strip().lower() == "true"
-AUTH_COOKIE_NAME = "refugio_access_token"
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:5175").rstrip("/")
+    @field_validator("secret_key")
+    @classmethod
+    def validate_secret_key(cls, value: SecretStr) -> SecretStr:
+        if len(value.get_secret_value().encode("utf-8")) < 32:
+            raise ValueError("SECRET_KEY debe tener al menos 32 bytes")
+        return value
 
-if not DATABASE_URL:
-    raise RuntimeError("Configura DATABASE_URL en backend/.env")
-if "CAMBIAR_PASSWORD" in DATABASE_URL:
-    raise RuntimeError("Actualiza DATABASE_URL con las credenciales de PostgreSQL")
-if len(SECRET_KEY.encode("utf-8")) < 32:
-    raise RuntimeError("SECRET_KEY debe tener al menos 32 bytes")
-if SESSION_INACTIVITY_MINUTES <= 0 or SESSION_MAX_MINUTES <= 0:
-    raise RuntimeError("Los tiempos de sesión deben ser enteros positivos")
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, value: str) -> str:
+        value = value.strip()
+        if "CAMBIAR_PASSWORD" in value:
+            raise ValueError("Actualiza DATABASE_URL con credenciales válidas")
+        return value
+
+    @property
+    def jwt_secret_key(self) -> str:
+        return self.secret_key.get_secret_value()
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+
+settings = get_settings()
+
+DATABASE_URL = settings.database_url
+SECRET_KEY = settings.jwt_secret_key
+ALGORITHM = settings.algorithm
+SESSION_INACTIVITY_MINUTES = settings.session_inactivity_minutes
+SESSION_MAX_MINUTES = settings.session_max_minutes
+COOKIE_SECURE = settings.cookie_secure
+AUTH_COOKIE_NAME = settings.auth_cookie_name
+FRONTEND_URL = settings.frontend_url.rstrip("/")

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 class MesaBase(BaseModel):
@@ -14,6 +16,8 @@ class MesaUpdate(BaseModel):
 class MesaOut(MesaBase):
     id: int
     sede_id: int
+    estado_operativo: Literal["LIBRE", "OCUPADA"] = "LIBRE"
+    pedido_abierto_id: int | None = None
     model_config = ConfigDict(from_attributes=True)
 
 class SedeBase(BaseModel):

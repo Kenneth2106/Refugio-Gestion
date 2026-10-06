@@ -23,10 +23,16 @@ def get_password_hash(password: str) -> str:
 
 
 def create_access_token(
-    data: Mapping[str, object], expires_delta: timedelta | None = None
+    data: Mapping[str, object],
+    expires_delta: timedelta | None = None,
+    issued_at: datetime | None = None,
 ) -> str:
     to_encode = data.copy()
-    now = datetime.now(timezone.utc)
+    now = issued_at or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    else:
+        now = now.astimezone(timezone.utc)
     to_encode.update(
         {
             "iat": now,
