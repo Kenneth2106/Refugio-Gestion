@@ -105,8 +105,7 @@ pospuestos.
 | HU-23 | Solo permite añadir a pedido ABIERTO | cumple | `test_hu23_agregar_producto_solo_a_pedido_abierto` |
 | HU-23 | Valida unidades y descuenta existencias | cumple | Test HU-23 y paso 5 E2E. |
 | HU-23 | Registra usuario y fecha/hora de la adición | cumple | Test HU-23 verifica detalle; campos `usuario_id`/`creado_en` de línea. |
-| HU-24 | Estado de mesa se actualiza con el pedido | cumple | `test_hu24_mesa_esta_ocupada_mientras_pedido_abierto`; estado se deriva de pedido ABIERTO. |
-| HU-24 | Mesa vuelve a LIBRE cuando el pedido se cierra | parcial | Cierre de pedidos está excluido; no hay ruta de cierre en Sprint 4. |
+| HU-24 | Estado cambia automáticamente al abrir/cerrar pedido | parcial | Se verifica OCUPADA al abrir; LIBRE después del cierre no puede verificarse porque cierre está excluido y no hay ruta de cierre. `test_hu24_mesa_esta_ocupada_mientras_pedido_abierto`. |
 | HU-24 | Solo muestra mesas de sede seleccionada | cumple | HU-19 y paso 7 E2E. |
 | HU-25 | Consulta estado, detalle y total del pedido | parcial | Detalle/total/ABIERTO se verifica en `test_hu25_consulta_detalle_total_y_restriccion_por_sede`; CERRADO depende del cierre excluido. |
 | HU-25 | Restringe pedidos por sede autorizada | cumple | Mismo test HU-25; paso 7 E2E. |
