@@ -26,6 +26,7 @@ app.include_router(inventario_router)
 app.include_router(ventas_router)
 
 
+# No expone excepciones internas al cliente ni registra tokens o contraseñas.
 @app.exception_handler(Exception)
 async def unexpected_error_handler(
     _request: Request,
@@ -43,6 +44,7 @@ async def validation_error_handler(
     _request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
+    # Omite valores enviados y sanea los mensajes de campos de contraseña.
     sanitized_errors = []
     for error in exc.errors():
         safe_error = dict(error)

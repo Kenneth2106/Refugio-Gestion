@@ -45,7 +45,7 @@ pospuestos.
 | HU-04 | Autoriza en backend en cada petición | cumple | Dependencias `get_current_session`, `require_site_access` y `require_selected_site`; paso 7 E2E. [auth/router.py](../backend/app/auth/router.py) |
 | HU-05 | Rechaza campos obligatorios ausentes e informa validación | cumple | Casos de campos requeridos de usuario, sede, mesa y producto en [test_usuarios.py](../backend/tests/test_usuarios.py), [test_sedes.py](../backend/tests/test_sedes.py) y [test_catalogo.py](../backend/tests/test_catalogo.py) |
 | HU-05 | Valida tipo, formato y valores permitidos | cumple | Tests `test_hu05_*`; schemas Pydantic de usuarios, sedes, catálogo e inventario. |
-| HU-05 | Los campos opcionales pueden omitirse | parcial | Se corrigió el correo heredado para que sea opcional (`test_hu07_usuario_sin_email_es_valido`). No existe un criterio exhaustivo por cada campo opcional. |
+| HU-05 | Los campos opcionales pueden omitirse | parcial | No existe un criterio exhaustivo por cada campo opcional. El correo es obligatorio al crear usuarios por decisión posterior; en edición parcial puede omitirse. |
 | HU-05 | Repite validación en backend | cumple | Schemas Pydantic y respuestas 422 de los casos `test_hu05_*`. |
 | HU-06 | Cierre manual disponible desde el menú de perfil | cumple | El botón Sign out del encabezado invoca `POST /auth/logout`; backend invalida la sesión. [main.js](../frontend/src/main.js) y [test_auth.py](../backend/tests/test_auth.py) |
 | HU-06 | Invalida sesión y token asociado | cumple | `test_hu06_logout_revokes_session_and_clears_cookie` en [test_auth.py](../backend/tests/test_auth.py) |
@@ -54,7 +54,7 @@ pospuestos.
 | HU-34 | Token lleva identificación, roles y sedes | cumple | `test_hu01_admin_session_exposes_roles_and_all_sites`; `user_roles` y `authorized_site_ids` en [auth/router.py](../backend/app/auth/router.py) |
 | HU-34 | Cada petición valida firma/expiración y jti activo en base de datos | cumple | `get_current_session` en [auth/router.py](../backend/app/auth/router.py); pruebas HU-03 y HU-34. |
 | HU-34 | JWT inválido/expirado se rechaza y redirige a login | parcial | Backend responde 401; redirección de navegador corresponde al frontend. |
-| HU-07 | Campos obligatorios, usuario creado ACTIVO y sede según función | cumple | `test_hu07_crear_usuario_exitoso`, `test_hu07_usuario_operativo_sin_sede_retorna_422`; paso 2 E2E. El estado activo por defecto fue decisión confirmada. |
+| HU-07 | Campos obligatorios, usuario creado ACTIVO y sede según función | cumple | `test_hu07_crear_usuario_exitoso`, `test_hu07_usuario_sin_email_retorna_422`, `test_hu07_usuario_email_invalido_retorna_422`, `test_hu07_usuario_operativo_sin_sede_retorna_422`; paso 2 E2E. El estado activo por defecto y el correo obligatorio fueron decisiones confirmadas. |
 | HU-07 | Identificación y nombre de usuario únicos | cumple | `test_hu07_identificacion_duplicada_retorna_400`; pruebas de usuario duplicado/normalización en [test_usuarios.py](../backend/tests/test_usuarios.py) |
 | HU-07 | Asigna al menos un rol y las sedes que requiere el usuario | cumple | `test_hu07_sin_rol_retorna_422`, `test_hu07_con_sede_valida_asigna_sede` |
 | HU-07 | Contraseña se protege en base de datos | cumple | `test_hu36_password_persisted_as_bcrypt_hash`; bcrypt directo en [security.py](../backend/app/core/security.py) |
@@ -157,10 +157,9 @@ mostrar en consola el resultado paso a paso. Resultado: **14/14 PASS**.
   (código 40, nombre 120, proveedor 120, `Numeric(12,2)`) no están fijadas por
   las historias. Son límites técnicos provisionales, no reglas funcionales
   confirmadas.
-- El correo electrónico venía exigido por el backend preexistente, pero no es
-  obligatorio en la propuesta ni en HU-07. Tras autorización del usuario se
-  convirtió en opcional; se conserva por compatibilidad, no como criterio de
-  aceptación.
+- El correo electrónico no aparece como obligatorio en HU-07. Por decisión
+  posterior del usuario se exige al crear cuentas y se valida con Pydantic;
+  sigue pudiéndose omitir en actualizaciones parciales.
 - El estado de alta de usuario se define automáticamente como ACTIVO, conforme
   a la decisión del usuario, aunque HU-07 enumera estado entre los campos del
   registro.

@@ -71,7 +71,7 @@ def crear_usuario(
         identificacion=usuario_in.identificacion,
         nombre=usuario_in.nombre,
         nombre_usuario=usuario_in.nombre_usuario.strip().lower(),
-        email=str(usuario_in.email) if usuario_in.email is not None else None,
+        email=str(usuario_in.email),
         hashed_password=get_password_hash(usuario_in.password.get_secret_value()),
         estado=True,
         es_admin=usuario_in.es_admin,

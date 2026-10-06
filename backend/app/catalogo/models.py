@@ -13,6 +13,7 @@ class Proveedor(Base):
 
 
 class Producto(Base):
+    # El catálogo es común a las sedes; las existencias viven en Inventario.
     __tablename__ = "productos"
 
     id = Column(Integer, primary_key=True)

@@ -37,8 +37,8 @@ comercial.
 - El proveedor tiene un ID generado por la base de datos y un nombre único por
   coincidencia exacta. Cada producto se asocia con un proveedor.
 - Los usuarios nuevos quedan activos al crearse; el alta no recibe un campo
-  `estado`. El correo electrónico heredado del backend se conserva opcional y
-  no es requisito de HU-07.
+  `estado`. Por decisión posterior, el correo electrónico es obligatorio y se
+  valida al crear una cuenta; en una actualización parcial puede omitirse.
 - HU-18 permite consultar usuarios, sedes, productos, proveedores, inventario,
   pedidos abiertos y estados de mesas.
 - Un JWT válido se renueva en cada petición autenticada, con expiración a los

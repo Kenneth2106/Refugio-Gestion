@@ -5,6 +5,7 @@ from app.core.database import Base
 
 
 class Inventario(Base):
+    # Cada fila representa unidades de un producto en una sede específica.
     __tablename__ = "inventarios"
     __table_args__ = (
         UniqueConstraint("sede_id", "producto_id", name="uq_inventario_sede_producto"),

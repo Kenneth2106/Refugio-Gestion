@@ -2,6 +2,7 @@ import "./styles.css"
 
 const app = document.querySelector("#app")
 const INACTIVITY_MS = 3 * 60 * 1000
+// La navegación es común; este control visual no sustituye los permisos de la API.
 const navigation = [
   { path: "/dashboard", label: "Overview", icon: "⌂", access: "any" },
   { path: "/dashboard/users", label: "Users", icon: "♙", access: "admin" },
@@ -60,6 +61,7 @@ function errorMessage(detail, status) {
 }
 
 async function api(path, options = {}) {
+  // Centraliza las peticiones JSON, la cookie de sesión y la presentación segura de errores HTTP.
   let response
   try {
     response = await fetch(path, {
@@ -131,6 +133,7 @@ function signOut(message = "") {
 }
 
 function startHeartbeat() {
+  // Consulta la sesión mientras hay actividad reciente y cierra la interfaz al detectar expiración.
   if (state.heartbeat) window.clearInterval(state.heartbeat)
   state.lastActivity = Date.now()
   state.heartbeat = window.setInterval(async () => {
@@ -324,7 +327,7 @@ async function renderUsers() {
         <label class="field">Identification number<input name="identificacion" maxlength="30" required></label>
         <label class="field">Full name<input name="nombre" maxlength="100" required></label>
         <label class="field">Username<input name="nombre_usuario" minlength="3" maxlength="50" required></label>
-        <label class="field">Email address (optional)<input name="email" type="email" autocomplete="email"></label>
+        <label class="field">Email address<input name="email" type="email" autocomplete="email" required></label>
         <label class="field">Password<input name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password"></label>
         <label class="field" data-status-field hidden>Account status<select name="estado"><option value="true">Active</option><option value="false">Inactive</option></select></label>
         <label class="field">Role<select name="role"><option value="mesero">Waiter</option><option value="cajero">Cashier</option><option value="admin">Administrator</option></select></label>
@@ -531,6 +534,7 @@ async function render() {
   }
   const access = navigation.find((item) => item.path === state.path)?.access || "any"
   let content
+  // Un módulo sin permiso muestra un aviso; el backend vuelve a autorizar cada petición protegida.
   if (!hasAccess(access)) {
     content = deniedPage()
   } else {
@@ -562,6 +566,7 @@ function resetUserForm(form) {
   form.elements.id.value = ""
   form.elements.password.required = false
   form.elements.password.placeholder = ""
+  form.elements.email.required = true
   form.elements.identificacion.disabled = false
   form.querySelector("[data-status-field]").hidden = true
   form.querySelector("[data-site-field]").hidden = false
@@ -584,6 +589,7 @@ async function onSubmit(event) {
   showFeedback(form, "")
   try {
     const data = formDataObject(form)
+    // Los formularios se traducen a las rutas REST; la validación final corresponde a FastAPI.
     if (type === "login") {
       await api("/auth/login", {
         method: "POST",
@@ -613,7 +619,7 @@ async function onSubmit(event) {
       if (!id) {
         payload.identificacion = data.identificacion.trim()
         payload.password = data.password
-        payload.email = data.email.trim() || null
+        payload.email = data.email.trim()
       } else {
         payload.estado = data.estado === "true"
         if (data.email.trim()) payload.email = data.email.trim()
@@ -740,6 +746,7 @@ async function onAction(actionElement) {
       form.elements.nombre.value = user.nombre
       form.elements.nombre_usuario.value = user.nombre_usuario
       form.elements.email.value = user.email || ""
+      form.elements.email.required = false
       form.elements.password.value = ""
       form.elements.password.required = false
       form.elements.password.placeholder = "Leave blank to keep current password"
@@ -857,6 +864,7 @@ window.addEventListener("popstate", () => {
 })
 
 async function bootstrap() {
+  // Recupera la sesión existente al cargar o recargar la página y dirige a login si no es válida.
   if (window.location.pathname === "/") {
     window.history.replaceState({}, "", "/login")
     state.path = "/login"

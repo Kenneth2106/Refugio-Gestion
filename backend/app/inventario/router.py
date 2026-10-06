@@ -19,6 +19,7 @@ def consultar_inventario(
     _: Usuario = Depends(require_mesero),
     db: Session = Depends(get_db),
 ) -> list[dict[str, object]]:
+    # La sede procede de la sesión seleccionada y ya fue autorizada por la dependencia.
     rows = (
         db.query(Inventario, Producto)
         .join(Producto, Producto.id == Inventario.producto_id)
@@ -52,6 +53,7 @@ def sumar_inventario(
     _: Usuario = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
+    # El upsert suma unidades atómicamente al inventario inicial de esa sede y producto.
     sede = (
         db.query(Sede)
         .filter(Sede.id == sede_id, Sede.estado.is_(True))

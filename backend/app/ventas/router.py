@@ -62,6 +62,7 @@ def lock_inventory(
     site_id: int,
     product_ids: list[int],
 ) -> dict[int, Inventario]:
+    # El orden estable de bloqueo evita ciclos cuando dos pedidos contienen varios productos.
     stocks = (
         db.query(Inventario)
         .filter(
@@ -91,6 +92,7 @@ def add_order_lines(
     stocks: dict[int, Inventario],
     now: datetime,
 ) -> None:
+    # Stock, precio histórico y línea se guardan en la transacción del endpoint.
     missing_stock = [
         product_id
         for product_id, quantity in product_quantities.items()
@@ -158,6 +160,7 @@ def crear_pedido(
     db: Session = Depends(get_db),
     now: datetime = Depends(get_utc_now),
 ) -> PedidoOut:
+    # Los bloqueos y el índice único parcial evitan pedidos abiertos duplicados.
     mesa = (
         db.query(Mesa)
         .filter(
@@ -234,6 +237,7 @@ def agregar_producto(
     db: Session = Depends(get_db),
     now: datetime = Depends(get_utc_now),
 ) -> PedidoOut:
+    # Serializa cambios al pedido abierto antes de validar stock y guardar la nueva línea.
     pedido = (
         db.query(Pedido)
         .filter(

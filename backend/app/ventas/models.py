@@ -19,6 +19,7 @@ from app.core.database import Base
 class Pedido(Base):
     __tablename__ = "pedidos"
     __table_args__ = (
+        # PostgreSQL permite solo un pedido ABIERTO por mesa, incluso con concurrencia.
         Index(
             "uq_pedidos_mesa_abierto",
             "mesa_id",

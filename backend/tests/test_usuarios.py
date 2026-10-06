@@ -465,16 +465,15 @@ def test_hu04_mesero_no_accede_a_mesas_de_sede_no_asignada(client):
 # HU-05 · Validación de campos en usuarios
 # ──────────────────────────────────────────────────────────────────────────────
 
-def test_hu07_usuario_sin_email_es_valido(client):
-    """HU-07 no declara el correo como campo obligatorio."""
+def test_hu07_usuario_sin_email_retorna_422(client):
+    """HU-07: El correo es obligatorio al crear un usuario."""
     payload = {k: v for k, v in NUEVO_USUARIO.items() if k != "email"}
     resp = crear_usuario(client, payload=payload)
-    assert resp.status_code == 201
-    assert resp.json()["email"] is None
+    assert resp.status_code == 422
 
 
-def test_hu05_usuario_email_invalido_retorna_422(client):
-    """HU-05: Un email con formato incorrecto es rechazado."""
+def test_hu07_usuario_email_invalido_retorna_422(client):
+    """HU-07: El correo obligatorio debe tener un formato válido."""
     payload = {**NUEVO_USUARIO, "email": "no-es-email"}
     resp = crear_usuario(client, payload=payload)
     assert resp.status_code == 422

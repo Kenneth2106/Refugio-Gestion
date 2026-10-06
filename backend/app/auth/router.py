@@ -84,6 +84,7 @@ def site_is_authorized(db: Session, usuario: Usuario, sede_id: int) -> bool:
     return query.first() is not None
 
 
+# Esta dependencia valida sesión, estado del usuario, roles/sedes actuales y ventanas de expiración.
 def get_current_session(
     request: Request,
     response: Response,
@@ -225,6 +226,7 @@ def require_admin(
     return usuario
 
 
+# Cada ruta reutiliza dependencias de rol para autorizar solicitudes en servidor.
 def require_mesero(
     usuario: Usuario = Depends(get_current_user),
 ) -> Usuario:
@@ -296,6 +298,7 @@ def login(
     db: Session = Depends(get_db),
     now: datetime = Depends(get_utc_now),
 ) -> dict[str, str]:
+    # El login sustituye las sesiones activas previas y registra el nuevo jti en la base.
     usuario = (
         db.query(Usuario)
         .filter(Usuario.identificacion == credentials.identificacion)
@@ -384,6 +387,7 @@ def current_user(
     session: SesionAutenticada = Depends(get_current_session),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
+    # El perfil se construye con datos actuales de base, no con los roles/sedes del JWT únicamente.
     usuario = session.usuario
     return {
         "id": usuario.id,
@@ -405,6 +409,7 @@ def select_site(
     session: SesionAutenticada = Depends(get_current_session),
     db: Session = Depends(get_db),
 ) -> dict[str, int]:
+    # La sede elegida queda asociada a la sesión persistida y se revalida en las siguientes peticiones.
     if not site_is_authorized(db, session.usuario, selection.sede_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

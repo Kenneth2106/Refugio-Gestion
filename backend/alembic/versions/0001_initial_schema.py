@@ -16,6 +16,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Crea el esquema actual y sus restricciones de integridad en PostgreSQL.
     op.create_table(
         "usuarios",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -177,6 +178,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Elimina las tablas en orden inverso a sus dependencias para permitir rollback de la revisión.
     op.drop_table("lineas_pedido")
     op.drop_index("uq_pedidos_mesa_abierto", table_name="pedidos")
     op.drop_table("pedidos")

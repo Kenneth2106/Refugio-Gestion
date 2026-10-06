@@ -11,6 +11,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
+# FastAPI reutiliza esta dependencia y cierra la sesión al terminar cada petición.
 def get_db() -> Generator:
     db = SessionLocal()
     try:

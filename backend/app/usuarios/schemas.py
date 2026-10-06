@@ -7,7 +7,7 @@ class UsuarioCreate(BaseModel):
     identificacion: str = Field(min_length=1, max_length=30)
     nombre: str = Field(min_length=1, max_length=100)
     nombre_usuario: str = Field(min_length=3, max_length=50)
-    email: EmailStr | None = None
+    email: EmailStr
     password: SecretStr = Field(min_length=8, max_length=72)
     es_admin: bool = False
     es_mesero: bool = False

@@ -5,7 +5,9 @@ import bcrypt
 from jose import jwt
 from app.core.settings import SESSION_MAX_MINUTES, ALGORITHM, SECRET_KEY
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    # bcrypt compara la clave con el hash persistido, nunca con texto plano.
     try:
         return bcrypt.checkpw(
             plain_password.encode("utf-8"),
@@ -16,6 +18,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def get_password_hash(password: str) -> str:
+    # bcrypt limita la entrada a 72 bytes; se valida antes de generar el hash.
     password_bytes = password.encode("utf-8")
     if len(password_bytes) > 72:
         raise ValueError("La contraseña supera el máximo permitido por bcrypt")
@@ -27,6 +30,7 @@ def create_access_token(
     expires_delta: timedelta | None = None,
     issued_at: datetime | None = None,
 ) -> str:
+    # El JWT identifica la sesión, cuyo jti y vigencia se verifican también en la base.
     to_encode = data.copy()
     now = issued_at or datetime.now(timezone.utc)
     if now.tzinfo is None:
