@@ -404,18 +404,26 @@ async function renderProducts() {
 }
 
 async function renderInventory() {
-  const inventory = state.user.sede_seleccionada_id ? await api("/inventario") : []
-  const productOptions = inventory.filter((item) => item.cantidad > 0).map((item) => `<option value="${item.producto_id}">${escapeHtml(item.codigo)} · ${escapeHtml(item.nombre)} (${item.cantidad})</option>`).join("")
+  const [inventory, allProducts] = await Promise.all([
+    state.user.sede_seleccionada_id ? api("/inventario") : Promise.resolve([]),
+    state.user.is_admin ? api("/productos") : Promise.resolve([]),
+  ])
+  // For add-units form: show ALL active catalog products (not just those already in inventory)
+  const catalogProductOptions = allProducts.filter((p) => p.estado).map((p) => {
+    const inStock = inventory.find((item) => item.producto_id === p.id)
+    const stockLabel = inStock ? ` (current: ${inStock.cantidad})` : " (no stock yet)"
+    return `<option value="${p.id}">${escapeHtml(p.codigo)} · ${escapeHtml(p.nombre)}${stockLabel}</option>`
+  }).join("")
   const rows = inventory.map((item) => `<tr><td>${escapeHtml(item.codigo)}</td><td>${escapeHtml(item.nombre)}</td>
     <td>${item.cantidad}</td><td><span class="status-pill ${item.cantidad ? "" : "inactive"}">${item.cantidad ? "Available" : "Out of stock"}</span></td></tr>`).join("")
   return `${pageHeading("Location operations", "Inventory", "Inventory balances belong to the selected location and use whole units.")}
     ${state.user.is_admin ? `<form class="section-block" data-form="inventory">
-      <div class="section-heading"><div><h2>Add units</h2><p>Administrators may add stock; manual reductions are not available.</p></div></div>
-      <div class="form-grid"><label class="field">Product<select name="producto_id" required><option value="">Select a product</option>${productOptions}</select></label>
+      <div class="section-heading"><div><h2>Add units</h2><p>Administrators may add stock to any product from the catalog; manual reductions are not available.</p></div></div>
+      <div class="form-grid"><label class="field">Product<select name="producto_id" required><option value="">Select a product</option>${catalogProductOptions}</select></label>
         <label class="field">Units<input name="cantidad" type="number" min="1" step="1" required></label>
         <div class="form-actions"><button class="button button-primary" type="submit" ${state.user.sede_seleccionada_id ? "" : "disabled"}>Add inventory</button></div>
       </div>${feedback()}</form>` : ""}
-    <section class="section-block"><div class="section-heading"><div><h2>${escapeHtml(state.user.sede_seleccionada_id ? siteName(state.user.sede_seleccionada_id) : "Select a location")}</h2><p>${inventory.length} product(s)</p></div></div>
+    <section class="section-block"><div class="section-heading"><div><h2>${escapeHtml(state.user.sede_seleccionada_id ? siteName(state.user.sede_seleccionada_id) : "Select a location")}</h2><p>${inventory.length} product(s) with stock</p></div></div>
       ${state.user.sede_seleccionada_id ? tableMarkup(["Code", "Product", "Units", "Availability"], rows, "No inventory has been loaded for this location.") : `<p class="notice">Choose a working location in the top bar to view inventory.</p>`}</section>`
 }
 
@@ -869,6 +877,10 @@ async function bootstrap() {
     window.history.replaceState({}, "", "/login")
     state.path = "/login"
   }
+  if (state.path === "/login") {
+    state.loading = false
+    await render()
+  }
   try {
     state.user = await api("/auth/me")
     await loadSites()
@@ -879,7 +891,7 @@ async function bootstrap() {
     }
   } catch (error) {
     state.user = null
-    if (error.status !== 401) setNotice(error.message, "error")
+    if (error.status && error.status !== 401) setNotice(error.message, "error")
     if (state.path !== "/login") {
       window.history.replaceState({}, "", "/login")
       state.path = "/login"
