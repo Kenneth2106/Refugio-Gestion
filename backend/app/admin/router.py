@@ -1,3 +1,5 @@
+"""Endpoint de consulta agregada disponible únicamente para administradores."""
+
 from fastapi import APIRouter, Depends
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session, joinedload
@@ -19,6 +21,7 @@ def consultar_informacion_general(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ) -> dict[str, object]:
+    """Devuelve un resumen de usuarios, sedes, catálogo, inventario y operación."""
     users = db.query(Usuario).options(joinedload(Usuario.sedes)).order_by(Usuario.id).all()
     sites = db.query(Sede).order_by(Sede.id).all()
     products = db.query(Producto).order_by(Producto.id).all()

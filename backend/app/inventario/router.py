@@ -1,3 +1,5 @@
+"""Consulta operativa y carga administrativa de inventario por sede."""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
@@ -19,6 +21,7 @@ def consultar_inventario(
     _: Usuario = Depends(require_mesero),
     db: Session = Depends(get_db),
 ) -> list[dict[str, object]]:
+    """Lista productos activos y cantidades de la sede seleccionada."""
     # La sede procede de la sesión seleccionada y ya fue autorizada por la dependencia.
     rows = (
         db.query(Inventario, Producto)
@@ -53,6 +56,7 @@ def sumar_inventario(
     _: Usuario = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
+    """Crea stock inicial o suma unidades existentes mediante upsert atómico."""
     # El upsert suma unidades atómicamente al inventario inicial de esa sede y producto.
     sede = (
         db.query(Sede)

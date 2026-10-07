@@ -1,5 +1,6 @@
 import "./styles.css"
 
+// Entrada de la SPA: estado compartido del navegador y navegación por vistas sin framework.
 const app = document.querySelector("#app")
 const INACTIVITY_MS = 3 * 60 * 1000
 // La navegación es común; este control visual no sustituye los permisos de la API.
@@ -26,6 +27,7 @@ const state = {
   noticeTimer: null,
 }
 
+// Utilidades de presentación y comunicación REST común a todos los módulos.
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => ({
     "&": "&amp;",
@@ -94,6 +96,7 @@ function hasRole(role) {
   return Boolean(state.user?.is_admin || state.user?.roles?.includes(role))
 }
 
+// La interfaz oculta operaciones no disponibles y muestra un aviso; la autorización real es del backend.
 function hasAccess(access) {
   if (access === "any") return true
   if (access === "admin") return Boolean(state.user?.is_admin)
@@ -269,6 +272,7 @@ function tableMarkup(headers, rows, emptyMessage = "No records found.") {
   </table></div>`
 }
 
+// Cada renderizador carga datos de su módulo y devuelve el HTML de la vista correspondiente.
 async function renderOverview() {
   if (state.user.is_admin) {
     const overview = await api("/admin/informacion-general")
@@ -376,13 +380,17 @@ async function renderProducts() {
     return `<tr><td>${escapeHtml(product.codigo)}</td><td>${escapeHtml(product.nombre)}</td>
       <td>${formatMoney(product.precio_venta)}</td><td>${formatMoney(product.precio_compra)}</td>
       <td>${escapeHtml(provider?.nombre || "")}</td><td>${product.estado ? "Active" : "Inactive"}</td>
-      <td><button class="button button-small" data-action="edit-product" data-product="${product.id}" type="button">Edit</button></td></tr>`
+      <td><div class="table-actions">
+        <button class="button button-small" data-action="edit-product" data-product="${product.id}" type="button">Edit</button>
+        <button class="button button-small ${product.estado ? "button-danger" : ""}" data-action="toggle-product" data-product="${product.id}" data-active="${product.estado}" type="button">${product.estado ? "Deactivate" : "Reactivate"}</button>
+      </div></td></tr>`
   }).join("")
   const providerOptions = providers.map((provider) => `<option value="${provider.id}">${escapeHtml(provider.nombre)}</option>`).join("")
   return `${pageHeading("Catalog management", "Products", "Manage the shared product catalog and its suppliers.")}
     <form class="section-block" data-form="provider">
-      <div class="section-heading"><div><h2>New supplier</h2><p>Supplier names are unique.</p></div></div>
+      <div class="section-heading"><div><h2>New supplier</h2><p>Supplier names are unique; contact number is optional.</p></div></div>
       <div class="form-grid"><label class="field">Supplier name<input name="nombre" maxlength="120" required></label>
+        <label class="field">Contact number<input name="numero_contacto" type="tel" maxlength="30" autocomplete="tel"></label>
         <div class="form-actions"><button class="button" type="submit">Create supplier</button></div></div>${feedback()}</form>
     <form class="section-block" data-form="product">
       <div class="section-heading"><div><h2 data-product-form-title>New product</h2><p>Inventory is recorded separately for each location.</p></div></div>
@@ -400,21 +408,28 @@ async function renderProducts() {
     <section class="section-block"><div class="section-heading"><div><h2>Catalog</h2><p>${products.length} product(s)</p></div></div>
       ${tableMarkup(["Code", "Product", "Sale price", "Purchase price", "Supplier", "Status", "Actions"], rows, "No products have been added.")}</section>
     <section class="section-block"><div class="section-heading"><div><h2>Suppliers</h2><p>${providers.length} supplier(s)</p></div></div>
-      ${tableMarkup(["ID", "Supplier"], providers.map((provider) => `<tr><td>${provider.id}</td><td>${escapeHtml(provider.nombre)}</td></tr>`).join(""), "No suppliers have been added.")}</section>`
+      ${tableMarkup(["ID", "Supplier", "Contact number"], providers.map((provider) => `<tr><td>${provider.id}</td><td>${escapeHtml(provider.nombre)}</td><td>${escapeHtml(provider.numero_contacto || "—")}</td></tr>`).join(""), "No suppliers have been added.")}</section>`
 }
 
 async function renderInventory() {
-  const inventory = state.user.sede_seleccionada_id ? await api("/inventario") : []
-  const productOptions = inventory.filter((item) => item.cantidad > 0).map((item) => `<option value="${item.producto_id}">${escapeHtml(item.codigo)} · ${escapeHtml(item.nombre)} (${item.cantidad})</option>`).join("")
+  const [inventory, products] = await Promise.all([
+    state.user.sede_seleccionada_id ? api("/inventario") : Promise.resolve([]),
+    state.user.is_admin ? api("/productos") : Promise.resolve([]),
+  ])
+  const inventoryByProduct = new Map(inventory.map((item) => [item.producto_id, item]))
+  const productOptions = products.filter((product) => product.estado).map((product) => {
+    const stock = inventoryByProduct.get(product.id)?.cantidad || 0
+    return `<option value="${product.id}">${escapeHtml(product.codigo)} · ${escapeHtml(product.nombre)} (${stock})</option>`
+  }).join("")
   const rows = inventory.map((item) => `<tr><td>${escapeHtml(item.codigo)}</td><td>${escapeHtml(item.nombre)}</td>
     <td>${item.cantidad}</td><td><span class="status-pill ${item.cantidad ? "" : "inactive"}">${item.cantidad ? "Available" : "Out of stock"}</span></td></tr>`).join("")
   return `${pageHeading("Location operations", "Inventory", "Inventory balances belong to the selected location and use whole units.")}
     ${state.user.is_admin ? `<form class="section-block" data-form="inventory">
-      <div class="section-heading"><div><h2>Add units</h2><p>Administrators may add stock; manual reductions are not available.</p></div></div>
+      <div class="section-heading"><div><h2>Add units</h2><p>Choose any active catalog product to load or increase stock at the selected location. Manual reductions are not available.</p></div></div>
       <div class="form-grid"><label class="field">Product<select name="producto_id" required><option value="">Select a product</option>${productOptions}</select></label>
         <label class="field">Units<input name="cantidad" type="number" min="1" step="1" required></label>
         <div class="form-actions"><button class="button button-primary" type="submit" ${state.user.sede_seleccionada_id ? "" : "disabled"}>Add inventory</button></div>
-      </div>${feedback()}</form>` : ""}
+      </div>${!state.user.sede_seleccionada_id ? `<p class="notice">Choose a working location before adding inventory.</p>` : ""}${feedback()}</form>` : ""}
     <section class="section-block"><div class="section-heading"><div><h2>${escapeHtml(state.user.sede_seleccionada_id ? siteName(state.user.sede_seleccionada_id) : "Select a location")}</h2><p>${inventory.length} product(s)</p></div></div>
       ${state.user.sede_seleccionada_id ? tableMarkup(["Code", "Product", "Units", "Availability"], rows, "No inventory has been loaded for this location.") : `<p class="notice">Choose a working location in the top bar to view inventory.</p>`}</section>`
 }
@@ -506,6 +521,7 @@ async function renderLogin() {
       ${feedback()}</form></section></main>`
 }
 
+// Asociación entre rutas de dashboard y renderizadores que construyen su contenido.
 const pageRenderers = {
   "/dashboard": renderOverview,
   "/dashboard/users": renderUsers,
@@ -553,6 +569,7 @@ async function render() {
   app.innerHTML = shell(content)
 }
 
+// Conversión de formularios y actualización de cuenta antes de enviar datos a la API.
 function formDataObject(form) {
   return Object.fromEntries(new FormData(form).entries())
 }
@@ -640,7 +657,10 @@ async function onSubmit(event) {
     if (type === "provider") {
       await api("/proveedores", {
         method: "POST",
-        body: JSON.stringify({ nombre: data.nombre.trim() }),
+        body: JSON.stringify({
+          nombre: data.nombre.trim(),
+          numero_contacto: data.numero_contacto.trim() || null,
+        }),
       })
       await refreshPage("Supplier created.")
       return
@@ -716,6 +736,7 @@ async function onSubmit(event) {
   }
 }
 
+// Refresca los datos de identidad/sedes tras cambios y despacha acciones de botones.
 async function refreshPage(message) {
   setNotice(message, "success")
   state.user = await api("/auth/me")
@@ -801,6 +822,13 @@ async function onAction(actionElement) {
       form.querySelector('[type="submit"]').textContent = "Save changes"
       form.querySelector('[data-action="cancel-product-edit"]').hidden = false
       form.scrollIntoView({ behavior: "smooth", block: "start" })
+    } else if (action === "toggle-product") {
+      const active = actionElement.dataset.active === "true"
+      await api(`/productos/${actionElement.dataset.product}`, {
+        method: "PATCH",
+        body: JSON.stringify({ estado: !active }),
+      })
+      await refreshPage(active ? "Product deactivated; existing records were preserved." : "Product reactivated.")
     } else if (action === "cancel-product-edit") {
       const form = document.querySelector('[data-form="product"]')
       form.reset()
@@ -823,6 +851,7 @@ async function onAction(actionElement) {
   }
 }
 
+// Listeners delegados: mantienen funcionales los controles que se recrean en cada render.
 document.addEventListener("submit", onSubmit)
 document.addEventListener("click", (event) => {
   const nav = event.target.closest("[data-nav]")
@@ -863,6 +892,7 @@ window.addEventListener("popstate", () => {
   void render()
 })
 
+// Recupera la sesión del backend al abrir la aplicación y selecciona la primera vista.
 async function bootstrap() {
   // Recupera la sesión existente al cargar o recargar la página y dirige a login si no es válida.
   if (window.location.pathname === "/") {

@@ -1,3 +1,5 @@
+"""Rutas administrativas para alta/consulta/edición de proveedores y productos."""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -27,7 +29,8 @@ def crear_proveedor(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ) -> Proveedor:
-    proveedor = Proveedor(nombre=proveedor_in.nombre)
+    """Registra proveedor; convierte duplicidad del nombre en conflicto HTTP."""
+    proveedor = Proveedor(**proveedor_in.model_dump())
     db.add(proveedor)
     try:
         db.commit()
@@ -46,6 +49,7 @@ def listar_proveedores(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ) -> list[Proveedor]:
+    """Lista el catálogo de proveedores para el administrador."""
     return db.query(Proveedor).order_by(Proveedor.id).all()
 
 
@@ -59,6 +63,7 @@ def crear_producto(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ) -> Producto:
+    """Crea producto central después de comprobar el proveedor."""
     if db.query(Proveedor.id).filter(Proveedor.id == producto_in.proveedor_id).first() is None:
         raise HTTPException(status_code=404, detail="Proveedor no encontrado")
     producto = Producto(**producto_in.model_dump())
@@ -80,6 +85,7 @@ def listar_productos(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ) -> list[Producto]:
+    """Lista productos activos e inactivos para gestión administrativa."""
     return db.query(Producto).order_by(Producto.id).all()
 
 
@@ -89,6 +95,7 @@ def obtener_producto(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ) -> Producto:
+    """Obtiene el detalle de un producto por su identificador."""
     producto = db.query(Producto).filter(Producto.id == producto_id).first()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -102,6 +109,7 @@ def actualizar_producto(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ) -> Producto:
+    """Actualiza datos permitidos; estado=false sirve para inactivar sin borrar."""
     producto = db.query(Producto).filter(Producto.id == producto_id).first()
     if producto is None:
         raise HTTPException(status_code=404, detail="Producto no encontrado")

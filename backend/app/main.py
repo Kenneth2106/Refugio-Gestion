@@ -1,3 +1,5 @@
+"""Ensamblado de FastAPI, rutas comunes y respuestas globales de error."""
+
 import logging
 
 from fastapi import FastAPI, Request
@@ -17,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Sistema Refugio Gestión")
 
+# Cada módulo mantiene sus rutas separadas y las publica bajo esta aplicación.
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(usuarios_router)
@@ -32,6 +35,7 @@ async def unexpected_error_handler(
     _request: Request,
     _exc: Exception,
 ) -> JSONResponse:
+    """Devuelve un error genérico sin filtrar detalles internos."""
     logger.error("Unhandled application error")
     return JSONResponse(
         status_code=500,
@@ -44,6 +48,7 @@ async def validation_error_handler(
     _request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
+    """Limpia valores sensibles antes de devolver errores de validación."""
     # Omite valores enviados y sanea los mensajes de campos de contraseña.
     sanitized_errors = []
     for error in exc.errors():
@@ -59,14 +64,17 @@ async def validation_error_handler(
 
 @app.get("/")
 def home() -> RedirectResponse:
+    """Envía la raíz al punto de entrada del frontend."""
     return RedirectResponse(url=f"{FRONTEND_URL}/login", status_code=303)
 
 
 @app.get("/login")
 def login_page() -> RedirectResponse:
+    """Mantiene una ruta de acceso compatible que apunta al frontend."""
     return RedirectResponse(url=f"{FRONTEND_URL}/login", status_code=307)
 
 
 @app.get("/dashboard")
 def dashboard() -> RedirectResponse:
+    """Mantiene una ruta de dashboard compatible que apunta al frontend."""
     return RedirectResponse(url=f"{FRONTEND_URL}/dashboard", status_code=307)

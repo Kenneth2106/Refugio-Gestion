@@ -1,3 +1,5 @@
+"""Configuración validada desde variables de entorno y el .env local."""
+
 from functools import lru_cache
 from pathlib import Path
 
@@ -6,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Define secretos y parámetros del backend con validación al arrancar."""
     # Los secretos y parámetros operativos se leen del entorno o del .env local.
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[2] / ".env",
@@ -31,6 +34,7 @@ class Settings(BaseSettings):
     @field_validator("secret_key")
     @classmethod
     def validate_secret_key(cls, value: SecretStr) -> SecretStr:
+        """Exige longitud mínima para el secreto con que se firman los JWT."""
         if len(value.get_secret_value().encode("utf-8")) < 32:
             raise ValueError("SECRET_KEY debe tener al menos 32 bytes")
         return value
@@ -38,6 +42,7 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def validate_database_url(cls, value: str) -> str:
+        """Rechaza la URL de base de datos que aún contenga una contraseña de ejemplo."""
         value = value.strip()
         if "CAMBIAR_PASSWORD" in value:
             raise ValueError("Actualiza DATABASE_URL con credenciales válidas")
@@ -50,6 +55,7 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Construye la configuración una sola vez por proceso."""
     return Settings()
 
 

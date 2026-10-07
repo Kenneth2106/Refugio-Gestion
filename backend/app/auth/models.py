@@ -1,3 +1,5 @@
+"""Modelo persistido para validar, renovar y revocar sesiones de usuario."""
+
 from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String
@@ -6,6 +8,8 @@ from app.core.database import Base
 
 
 class SesionActiva(Base):
+    """Asocia el jti del JWT con su usuario, actividad y sede seleccionada."""
+
     __tablename__ = "sesiones_activas"
     __table_args__ = (
         Index("ix_sesiones_activas_usuario_activa", "usuario_id", "activa"),

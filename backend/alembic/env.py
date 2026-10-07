@@ -1,3 +1,5 @@
+"""Configura Alembic con metadatos ORM y conexión por entorno o tests."""
+
 from logging.config import fileConfig
 
 from alembic import context
@@ -20,6 +22,7 @@ MODEL_MODULES = (
     inventory_models,
     order_models,
 )
+# Importar todos los modelos registra sus tablas antes de que Alembic compare metadatos.
 
 config = context.config
 database_url = config.get_main_option("sqlalchemy.url")
@@ -31,6 +34,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
+    """Genera/ejecuta migraciones usando URL y SQL literal sin abrir conexión."""
     context.configure(
         url=database_url,
         target_metadata=target_metadata,
@@ -43,6 +47,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    """Aplica migraciones mediante conexión activa o una conexión propia."""
     supplied_connection = config.attributes.get("connection")
     if supplied_connection is not None:
         context.configure(

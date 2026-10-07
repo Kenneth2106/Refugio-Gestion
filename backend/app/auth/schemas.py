@@ -1,7 +1,10 @@
+"""Contratos de entrada y salida para autenticación y selección de sede."""
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator
 
 
 class LoginSchema(BaseModel):
+    """Credenciales aceptadas por el endpoint de inicio de sesión."""
     model_config = ConfigDict(extra="forbid")
 
     identificacion: str = Field(min_length=1, max_length=30)
@@ -21,12 +24,14 @@ class LoginSchema(BaseModel):
 
 
 class TokenSchema(BaseModel):
+    """Respuesta del login con token, tipo y destino inicial."""
     access_token: str
     token_type: str
     redirect_to: str
 
 
 class CurrentUserSchema(BaseModel):
+    """Perfil derivado de los datos vigentes del usuario y su sesión."""
     id: int
     identificacion: str
     nombre: str
@@ -40,6 +45,7 @@ class CurrentUserSchema(BaseModel):
 
 
 class SiteSelectionSchema(BaseModel):
+    """Identificador de la sede que el usuario solicita seleccionar."""
     model_config = ConfigDict(extra="forbid")
 
     sede_id: int = Field(gt=0)

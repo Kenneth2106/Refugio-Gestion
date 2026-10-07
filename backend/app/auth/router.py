@@ -1,3 +1,5 @@
+"""Rutas de autenticación y dependencias reutilizables de rol/sede/sesión."""
+
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -31,6 +33,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def unauthorized(detail: str = "Autenticación requerida o sesión vencida") -> HTTPException:
+    """Construye una respuesta uniforme para credenciales o sesiones inválidas."""
     return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail=detail,
@@ -40,6 +43,8 @@ def unauthorized(detail: str = "Autenticación requerida o sesión vencida") -> 
 
 @dataclass(frozen=True)
 class SesionAutenticada:
+    """Contexto validado que una petición autenticada comparte con sus endpoints."""
+
     usuario: Usuario
     jti: str
     expires_at: int
@@ -47,12 +52,14 @@ class SesionAutenticada:
 
 
 def as_utc(value: datetime) -> datetime:
+    """Normaliza una fecha con o sin tzinfo a UTC."""
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
 
 
 def user_roles(usuario: Usuario) -> list[str]:
+    """Deriva roles operativos desde los roles actuales guardados en base."""
     roles = ["admin"] if usuario.es_admin else []
     if usuario.es_admin or usuario.es_mesero:
         roles.append("mesero")
@@ -62,6 +69,7 @@ def user_roles(usuario: Usuario) -> list[str]:
 
 
 def authorized_site_ids(db: Session, usuario: Usuario) -> list[int]:
+    """Lista sedes activas del usuario; el administrador tiene alcance global."""
     query = db.query(Sede.id).filter(Sede.estado.is_(True))
     if not usuario.es_admin:
         query = (
@@ -72,6 +80,7 @@ def authorized_site_ids(db: Session, usuario: Usuario) -> list[int]:
 
 
 def site_is_authorized(db: Session, usuario: Usuario, sede_id: int) -> bool:
+    """Comprueba el acceso vigente a una sede concreta."""
     query = db.query(Sede.id).filter(
         Sede.id == sede_id,
         Sede.estado.is_(True),
@@ -92,6 +101,7 @@ def get_current_session(
     db: Session = Depends(get_db),
     now: datetime = Depends(get_utc_now),
 ) -> SesionAutenticada:
+    """Valida JWT, jti, usuario, inactividad y límite absoluto en cada petición."""
     token = (
         credentials.credentials
         if credentials is not None
@@ -212,12 +222,14 @@ def get_current_session(
 def get_current_user(
     session: SesionAutenticada = Depends(get_current_session),
 ) -> Usuario:
+    """Extrae el usuario de la sesión que ya fue validada."""
     return session.usuario
 
 
 def require_admin(
     usuario: Usuario = Depends(get_current_user),
 ) -> Usuario:
+    """Permite continuar solo a cuentas administradoras."""
     if not usuario.es_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -230,6 +242,7 @@ def require_admin(
 def require_mesero(
     usuario: Usuario = Depends(get_current_user),
 ) -> Usuario:
+    """Exige capacidad de mesero, incluida la concedida al administrador."""
     if not (usuario.es_admin or usuario.es_mesero):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -241,6 +254,7 @@ def require_mesero(
 def require_cajero(
     usuario: Usuario = Depends(get_current_user),
 ) -> Usuario:
+    """Exige capacidad de cajero, incluida la concedida al administrador."""
     if not (usuario.es_admin or usuario.es_cajero):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -254,6 +268,7 @@ def require_site_access(
     session: SesionAutenticada = Depends(get_current_session),
     db: Session = Depends(get_db),
 ) -> Sede:
+    """Valida acceso a la sede de la ruta y la persiste como sede activa."""
     if not site_is_authorized(db, session.usuario, sede_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -278,6 +293,7 @@ def require_selected_site(
     session: SesionAutenticada = Depends(get_current_session),
     db: Session = Depends(get_db),
 ) -> Sede:
+    """Exige una sede seleccionada y comprueba que siga autorizada."""
     selected_site_id = session.sede_seleccionada_id
     if selected_site_id is None:
         raise HTTPException(
@@ -298,6 +314,7 @@ def login(
     db: Session = Depends(get_db),
     now: datetime = Depends(get_utc_now),
 ) -> dict[str, str]:
+    """Autentica, revoca sesiones anteriores y crea la nueva sesión/JWT."""
     # El login sustituye las sesiones activas previas y registra el nuevo jti en la base.
     usuario = (
         db.query(Usuario)
@@ -387,6 +404,7 @@ def current_user(
     session: SesionAutenticada = Depends(get_current_session),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
+    """Expone perfil, roles y sedes consultados desde la base de datos."""
     # El perfil se construye con datos actuales de base, no con los roles/sedes del JWT únicamente.
     usuario = session.usuario
     return {
@@ -409,6 +427,7 @@ def select_site(
     session: SesionAutenticada = Depends(get_current_session),
     db: Session = Depends(get_db),
 ) -> dict[str, int]:
+    """Guarda en la sesión activa la sede de trabajo elegida."""
     # La sede elegida queda asociada a la sesión persistida y se revalida en las siguientes peticiones.
     if not site_is_authorized(db, session.usuario, selection.sede_id):
         raise HTTPException(
@@ -435,6 +454,7 @@ def logout(
     session: SesionAutenticada = Depends(get_current_session),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
+    """Revoca la fila de sesión y borra la cookie del navegador."""
     active_session = (
         db.query(SesionActiva)
         .filter(
@@ -462,4 +482,5 @@ def logout(
 def ping(
     _session: SesionAutenticada = Depends(get_current_session),
 ) -> dict[str, str]:
+    """Verifica conectividad autenticada aplicando el control de sesión habitual."""
     return {"message": "pong"}

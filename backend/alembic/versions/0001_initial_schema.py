@@ -3,6 +3,8 @@
 Revision ID: 0001_initial
 Revises:
 Create Date: 2026-10-06
+
+Esquema PostgreSQL versionado: entidades operativas, claves y restricciones.
 """
 
 from alembic import op
@@ -16,6 +18,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    """Crea las tablas, índices y restricciones iniciales del sistema."""
     # Crea el esquema actual y sus restricciones de integridad en PostgreSQL.
     op.create_table(
         "usuarios",
@@ -178,6 +181,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Revierte la revisión en orden inverso a las dependencias entre tablas."""
     # Elimina las tablas en orden inverso a sus dependencias para permitir rollback de la revisión.
     op.drop_table("lineas_pedido")
     op.drop_index("uq_pedidos_mesa_abierto", table_name="pedidos")

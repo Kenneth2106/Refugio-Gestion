@@ -2,8 +2,8 @@
 
 ## Resultado de ejecución
 
-- Suite completa: **94 passed**, 0 failed, 1 warning deprecado de
-  `starlette.testclient`/`httpx`; 146,64 s.
+- Suite completa: **96 passed**, 0 failed, 1 warning deprecado de
+  `starlette.testclient`/`httpx`; 202,73 s (última ejecución).
 - Base usada: PostgreSQL real `refugio_db`. Cada prueba creó un esquema
   `test_refugio_<uuid>`, aplicó Alembic y eliminó únicamente ese esquema.
   No se ejecutaron pruebas ni limpieza sobre `public`; no fue necesario
@@ -77,6 +77,7 @@ pospuestos.
 | HU-11 | Rechaza producto incompleto | cumple | `test_hu11_producto_exige_todos_los_campos_incluido_proveedor` |
 | HU-12 | Proveedor obligatorio al crear/editar producto | cumple | `test_hu11_producto_exige_todos_los_campos_incluido_proveedor`; validación de proveedor en [catalogo/router.py](../backend/app/catalogo/router.py) |
 | HU-12 | Conserva relación producto–proveedor | cumple | `test_hu12_producto_conserva_relacion_con_proveedor` |
+| HU-12 | Número de contacto del proveedor opcional | cumple | `test_hu12_proveedor_guarda_numero_contacto_opcional`; migración `0002_proveedor_contacto` |
 | HU-12 | No añade compras ni abastecimiento | cumple | No se encontraron endpoints de compras/abastecimiento. |
 | HU-13 | Selecciona automáticamente cuando hay una sede | cumple | `test_hu13_una_sede_autorizada_seleccionada_automaticamente` |
 | HU-13 | Permite elegir cuando hay varias sedes | cumple | `test_hu13_admin_elige_sede_y_se_guarda_en_la_sesion` |

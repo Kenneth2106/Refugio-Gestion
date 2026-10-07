@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@400;500&display=swap');
 
+/* Tokens visuales basados en la identidad del bar y reglas globales de accesibilidad. */
 :root {
   font-family: 'DM Sans', 'Segoe UI', sans-serif;
   color: #251f16;
@@ -26,6 +27,7 @@ h1, h2, h3, p { margin-top: 0; }
 a { color: inherit; }
 :focus-visible { outline: 3px solid #c9a65a; outline-offset: 2px; }
 
+/* Marco de la aplicación autenticada, encabezado y selección de sede. */
 .app-shell { min-height: 100vh; background: var(--canvas); }
 .topbar { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 11px 28px; background: var(--forest); color: #f5ecd8; border-bottom: 1px solid #40351f; }
 .brand-lockup { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; font: 20px 'Playfair Display', Georgia, serif; white-space: nowrap; }
@@ -46,6 +48,8 @@ a { color: inherit; }
 .button-quiet:hover { background: #292217; }
 .button-danger { color: #8a3f32; border-color: #d9bcb0; }
 .button-small { min-height: 32px; padding: 5px 9px; font-size: 12px; }
+
+/* Navegación lateral compartida y área de contenido de cada módulo. */
 .dashboard-layout { min-height: calc(100vh - 68px); display: grid; grid-template-columns: 232px minmax(0, 1fr); }
 .sidebar { padding: 26px 14px; background: #fcf9f1; border-right: 1px solid var(--line); }
 .sidebar-heading { margin: 0 12px 12px; color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
@@ -64,6 +68,8 @@ a { color: inherit; }
 .section-heading h2 { margin: 0; font: 400 24px 'Playfair Display', Georgia, serif; }
 .section-heading p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
 .section-block { padding: 22px 0; border-top: 1px solid var(--line); }
+
+/* Formularios, mensajes de validación, tablas y métricas reutilizables. */
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px 18px; max-width: 800px; }
 .field { display: grid; gap: 7px; color: #433a29; font-size: 12px; font-weight: 700; }
 .field input, .field select { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid #c8bda4; border-radius: 4px; background: #fffdf8; color: var(--ink); font: 14px 'DM Sans', sans-serif; }
@@ -91,6 +97,8 @@ a { color: inherit; }
 .status-pill { display: inline-flex; padding: 4px 8px; border-radius: 20px; background: #eee6d2; color: #665022; font-size: 10px; font-weight: 700; white-space: nowrap; }
 .status-pill.inactive { background: #f3e7df; color: #874c39; }
 .status-pill.occupied { background: #f1e4c2; color: #74571e; }
+
+/* Estados de acceso restringido y tarjetas con el detalle de pedidos. */
 .access-denied, .error-panel { max-width: 680px; padding: clamp(26px, 5vw, 48px); border: 1px solid #d8c69c; background: #fffdf8; }
 .denied-mark { display: grid; width: 38px; height: 38px; margin-bottom: 20px; place-items: center; border-radius: 50%; background: #f1e7d0; color: #75591f; font-weight: 800; }
 .access-denied .button, .error-panel .button { margin-top: 24px; }
@@ -109,6 +117,8 @@ a { color: inherit; }
 .inline-form .feedback { flex-basis: 100%; }
 .order-product-list { grid-column: 1 / -1; display: grid; gap: 12px; }
 .order-product-row { display: grid; grid-template-columns: minmax(0, 1fr) 100px; gap: 14px; }
+
+/* Composición de la pantalla de inicio de sesión y notificaciones. */
 .login-shell { min-height: 100vh; display: grid; grid-template-columns: minmax(290px, .82fr) minmax(360px, 1.18fr); background: var(--canvas); }
 .login-brand { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: clamp(32px, 6vw, 76px); background: radial-gradient(ellipse at 30% 45%, #211c13 0, #100e0b 62%); color: #f5ecd8; }
 .login-logo { width: clamp(150px, 20vw, 220px); height: auto; align-self: center; filter: drop-shadow(0 12px 28px rgb(0 0 0 / 35%)); }
@@ -126,6 +136,7 @@ a { color: inherit; }
 .toast-success { border-color: #c9b579; }
 .toast-error { border-color: #d7b4aa; color: #8f392f; }
 
+/* Breakpoints para convertir navegación, formularios y login en layouts móviles. */
 @media (max-width: 850px) {
   .topbar { align-items: flex-start; }
   .topbar-right { align-items: end; flex-direction: column; gap: 8px; }

@@ -1,3 +1,5 @@
+"""Modelo de existencia entera por combinación de sede y producto."""
+
 from sqlalchemy import CheckConstraint, Column, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import relationship
 
@@ -5,6 +7,7 @@ from app.core.database import Base
 
 
 class Inventario(Base):
+    """Restringe duplicados por sede/producto y cantidades negativas."""
     # Cada fila representa unidades de un producto en una sede específica.
     __tablename__ = "inventarios"
     __table_args__ = (

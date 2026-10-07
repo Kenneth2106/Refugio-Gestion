@@ -82,7 +82,9 @@ El administrador puede crear y mantener:
    asignadas. El correo se valida al crear; los usuarios se crean activos.
 4. **Proveedores:** identificados por nombre único.
 5. **Productos:** catálogo central con código único, nombre, precios de compra
-   y venta, estado y proveedor. El producto no guarda cantidades de inventario.
+   y venta, estado y proveedor. El botón “Delete” lo inactiva para conservar
+   su historial y permite reactivarlo; no borra físicamente el registro. El
+   producto no guarda cantidades de inventario.
 6. **Inventario por sede:** la carga administrativa crea o incrementa la
    existencia de un producto para la sede de trabajo. No hay traslado entre
    sedes ni reducción manual de existencias.

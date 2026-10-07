@@ -1,3 +1,5 @@
+"""Rutas de administración de sedes y mesas y consulta operativa por sede."""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -30,6 +32,7 @@ def crear_sede(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ) -> Sede:
+    """Crea sede con código único; solo un administrador puede hacerlo."""
     sede = Sede(**sede_in.model_dump())
     db.add(sede)
     try:
@@ -49,6 +52,7 @@ def listar_sedes(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ) -> list[Sede]:
+    """Lista sedes activas globales al admin o asignadas al usuario."""
     query = db.query(Sede).filter(Sede.estado.is_(True))
     if not current_user.es_admin:
         query = query.join(
@@ -65,6 +69,7 @@ def actualizar_sede(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ) -> Sede:
+    """Modifica datos o estado de una sede sin borrarla."""
     sede = db.query(Sede).filter(Sede.id == sede_id).first()
     if sede is None:
         raise HTTPException(status_code=404, detail="Sede no encontrada")
@@ -97,6 +102,7 @@ def crear_mesa(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ) -> Mesa:
+    """Registra una mesa con número único dentro de la sede indicada."""
     sede = (
         db.query(Sede)
         .filter(Sede.id == sede_id, Sede.estado.is_(True))
@@ -124,6 +130,7 @@ def listar_mesas_sede(
     _: Usuario = Depends(require_mesero),
     db: Session = Depends(get_db),
 ) -> list[dict[str, object]]:
+    """Lista mesas autorizadas y deriva su estado de pedidos abiertos."""
     mesas = (
         db.query(Mesa)
         .filter(
@@ -167,6 +174,7 @@ def actualizar_mesa(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ) -> Mesa:
+    """Actualiza número o estado de mesa, conservando sus referencias."""
     mesa = db.query(Mesa).filter(Mesa.id == mesa_id).first()
     if mesa is None:
         raise HTTPException(status_code=404, detail="Mesa no encontrada")

@@ -1,3 +1,5 @@
+"""Modelos de pedidos abiertos y líneas con precios históricos."""
+
 from datetime import datetime, timezone
 
 from sqlalchemy import (
@@ -17,6 +19,7 @@ from app.core.database import Base
 
 
 class Pedido(Base):
+    """Pedido asociado a usuario, sede y mesa, con unicidad si está abierto."""
     __tablename__ = "pedidos"
     __table_args__ = (
         # PostgreSQL permite solo un pedido ABIERTO por mesa, incluso con concurrencia.
@@ -60,6 +63,7 @@ class Pedido(Base):
 
 
 class LineaPedido(Base):
+    """Producto/cantidad del pedido con precio, usuario y fecha de registro."""
     __tablename__ = "lineas_pedido"
     __table_args__ = (
         CheckConstraint("cantidad > 0", name="ck_linea_pedido_cantidad_positiva"),

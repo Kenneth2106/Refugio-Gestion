@@ -34,8 +34,9 @@ comercial.
 - El inventario se carga por sede mediante una operación de administrador que
   permite crear la existencia inicial y sumar unidades posteriormente. No se
   permite reducir manualmente la existencia; los pedidos la descuentan.
-- El proveedor tiene un ID generado por la base de datos y un nombre único por
-  coincidencia exacta. Cada producto se asocia con un proveedor.
+- El proveedor tiene un ID generado por la base de datos, un nombre único por
+  coincidencia exacta y un número de contacto opcional. Cada producto se asocia
+  con un proveedor.
 - Los usuarios nuevos quedan activos al crearse; el alta no recibe un campo
   `estado`. Por decisión posterior, el correo electrónico es obligatorio y se
   valida al crear una cuenta; en una actualización parcial puede omitirse.

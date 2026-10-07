@@ -1,0 +1,1 @@
+"""Sedes del negocio, sus mesas y la relación de acceso de usuarios."""

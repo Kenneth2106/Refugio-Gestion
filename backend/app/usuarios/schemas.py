@@ -1,7 +1,10 @@
+"""Esquemas de creación, actualización y salida de usuarios."""
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator
 
 
 class UsuarioCreate(BaseModel):
+    """Entrada validada; requiere correo válido y protege la contraseña."""
     model_config = ConfigDict(extra="forbid")
 
     identificacion: str = Field(min_length=1, max_length=30)
@@ -33,6 +36,7 @@ class UsuarioCreate(BaseModel):
 
 
 class UsuarioUpdate(BaseModel):
+    """Actualización parcial; permite omitir los campos que no cambian."""
     model_config = ConfigDict(extra="forbid")
 
     nombre: str | None = Field(None, min_length=1, max_length=100)
@@ -57,6 +61,7 @@ class UsuarioUpdate(BaseModel):
 
 
 class UsuarioOut(BaseModel):
+    """Datos públicos de cuenta sin hash ni contraseña."""
     id: int
     identificacion: str
     nombre: str

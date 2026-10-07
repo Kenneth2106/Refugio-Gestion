@@ -1,3 +1,5 @@
+"""Modelos ORM de usuarios, roles y relaciones usuario-sede."""
+
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
@@ -5,6 +7,7 @@ from app.core.database import Base
 
 
 class UsuarioSede(Base):
+    """Tabla de asociación muchos-a-muchos entre usuarios operativos y sedes."""
     __tablename__ = "usuario_sedes"
 
     usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), primary_key=True)
@@ -15,6 +18,7 @@ class UsuarioSede(Base):
 
 
 class Usuario(Base):
+    """Cuenta autenticable con hash bcrypt, estado y capacidades de rol."""
     __tablename__ = "usuarios"
 
     id = Column(Integer, primary_key=True, index=True)

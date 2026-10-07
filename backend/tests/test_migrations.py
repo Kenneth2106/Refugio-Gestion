@@ -29,6 +29,9 @@ def test_hu37_alembic_upgrade_downgrade_upgrade_on_empty_schema(db_engine):
             "pedidos",
             "lineas_pedido",
         } <= upgraded_tables
+        assert "numero_contacto" in {
+            column["name"] for column in inspect(connection).get_columns("proveedores")
+        }
 
         indexes = inspect(connection).get_indexes("pedidos")
         open_order_index = next(
@@ -38,3 +41,11 @@ def test_hu37_alembic_upgrade_downgrade_upgrade_on_empty_schema(db_engine):
         )
         assert open_order_index["unique"] is True
         assert "ABIERTO" in open_order_index["dialect_options"]["postgresql_where"]
+
+        command.downgrade(config, "0001_initial")
+        downgraded_columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("proveedores")
+        }
+        assert "numero_contacto" not in downgraded_columns
+        command.upgrade(config, "head")

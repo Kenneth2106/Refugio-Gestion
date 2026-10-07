@@ -1,3 +1,5 @@
+"""Rutas administrativas para crear, editar, listar e inactivar usuarios."""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
@@ -15,6 +17,7 @@ router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 
 
 def _build_out(usuario: Usuario) -> UsuarioOut:
+    """Convierte el modelo y sus asociaciones en la respuesta de usuario."""
     return UsuarioOut(
         id=usuario.id,
         identificacion=usuario.identificacion,
@@ -35,6 +38,7 @@ def crear_usuario(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ):
+    """Valida rol/sedes, almacena el hash y crea la cuenta activa."""
     # Validar que al menos un rol esté activo
     if not any([usuario_in.es_admin, usuario_in.es_mesero, usuario_in.es_cajero]):
         raise HTTPException(
@@ -106,6 +110,7 @@ def listar_usuarios(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ):
+    """Devuelve las cuentas y asignaciones visibles para el administrador."""
     usuarios = db.query(Usuario).options(joinedload(Usuario.sedes)).all()
     return [_build_out(u) for u in usuarios]
 
@@ -116,6 +121,7 @@ def obtener_usuario(
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ):
+    """Consulta una cuenta específica para administración."""
     usuario = db.query(Usuario).options(joinedload(Usuario.sedes)).filter(Usuario.id == usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -129,6 +135,7 @@ def actualizar_usuario(
     db: Session = Depends(get_db),
     admin: Usuario = Depends(require_admin),
 ):
+    """Modifica perfil, roles y sedes; inactivar revoca sesiones abiertas."""
     usuario = db.query(Usuario).options(joinedload(Usuario.sedes)).filter(Usuario.id == usuario_id).first()
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -219,6 +226,7 @@ def inactivar_usuario(
     db: Session = Depends(get_db),
     admin: Usuario = Depends(require_admin),
 ):
+    """Deshabilita la cuenta y revoca cada una de sus sesiones activas."""
     if usuario_id == admin.id:
         raise HTTPException(status_code=400, detail="No puedes inactivarte a ti mismo")
 

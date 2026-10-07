@@ -1,3 +1,5 @@
+"""Operaciones del mesero para consultar mesas y gestionar pedidos abiertos."""
+
 from decimal import Decimal
 from datetime import datetime
 
@@ -28,6 +30,7 @@ router = APIRouter(tags=["Pedidos"])
 
 
 def serialize_order(pedido: Pedido) -> PedidoOut:
+    """Construye líneas de salida y total decimal usando precios guardados."""
     lines = [
         LineaPedidoOut(
             id=line.id,
@@ -62,6 +65,7 @@ def lock_inventory(
     site_id: int,
     product_ids: list[int],
 ) -> dict[int, Inventario]:
+    """Bloquea stock en orden estable para evitar sobreventa y deadlocks."""
     # El orden estable de bloqueo evita ciclos cuando dos pedidos contienen varios productos.
     stocks = (
         db.query(Inventario)
@@ -77,6 +81,7 @@ def lock_inventory(
 
 
 def aggregate_items(items: list[tuple[int, int]]) -> dict[int, int]:
+    """Suma cantidades repetidas del mismo producto en una sola entrada."""
     aggregated: dict[int, int] = {}
     for product_id, quantity in items:
         aggregated[product_id] = aggregated.get(product_id, 0) + quantity
@@ -92,6 +97,7 @@ def add_order_lines(
     stocks: dict[int, Inventario],
     now: datetime,
 ) -> None:
+    """Valida stock, descuenta unidades y agrega líneas con precio histórico."""
     # Stock, precio histórico y línea se guardan en la transacción del endpoint.
     missing_stock = [
         product_id
@@ -127,6 +133,7 @@ def obtener_pedido_abierto_de_mesa(
     _: Usuario = Depends(require_mesero),
     db: Session = Depends(get_db),
 ) -> PedidoOut | None:
+    """Devuelve el pedido abierto de la mesa autorizada, si existe."""
     mesa = (
         db.query(Mesa)
         .filter(
@@ -160,6 +167,7 @@ def crear_pedido(
     db: Session = Depends(get_db),
     now: datetime = Depends(get_utc_now),
 ) -> PedidoOut:
+    """Crea pedido ABIERTO y descuenta todas sus líneas en una transacción."""
     # Los bloqueos y el índice único parcial evitan pedidos abiertos duplicados.
     mesa = (
         db.query(Mesa)
@@ -237,6 +245,7 @@ def agregar_producto(
     db: Session = Depends(get_db),
     now: datetime = Depends(get_utc_now),
 ) -> PedidoOut:
+    """Añade productos solo a un pedido abierto de la sede seleccionada."""
     # Serializa cambios al pedido abierto antes de validar stock y guardar la nueva línea.
     pedido = (
         db.query(Pedido)
@@ -282,6 +291,7 @@ def listar_pedidos_de_sede(
     _: Usuario = Depends(require_mesero),
     db: Session = Depends(get_db),
 ) -> list[PedidoOut]:
+    """Lista pedidos de la sede autorizada, con detalle y total."""
     pedidos = (
         db.query(Pedido)
         .options(joinedload(Pedido.lineas).joinedload(LineaPedido.producto))
@@ -299,6 +309,7 @@ def consultar_pedido(
     _: Usuario = Depends(require_mesero),
     db: Session = Depends(get_db),
 ) -> PedidoOut:
+    """Consulta un pedido solo si pertenece a la sede actualmente autorizada."""
     pedido = (
         db.query(Pedido)
         .options(joinedload(Pedido.lineas).joinedload(LineaPedido.producto))

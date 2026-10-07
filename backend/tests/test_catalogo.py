@@ -3,6 +3,7 @@ from decimal import Decimal
 from sqlalchemy.orm import sessionmaker
 
 from app.catalogo.models import Producto, Proveedor
+from app.inventario.models import Inventario
 from tests.conftest import auth_headers
 
 
@@ -51,6 +52,25 @@ def test_hu12_nombre_proveedor_difiere_por_mayusculas_es_valido(client):
 
     assert first.status_code == 201
     assert second.status_code == 201
+
+
+def test_hu12_proveedor_guarda_numero_contacto_opcional(client):
+    headers = auth_headers(client)
+    with_contact = client.post(
+        "/proveedores",
+        json={"nombre": "Proveedor con contacto", "numero_contacto": "+57 300 123 4567"},
+        headers=headers,
+    )
+    without_contact = client.post(
+        "/proveedores",
+        json={"nombre": "Proveedor sin contacto"},
+        headers=headers,
+    )
+
+    assert with_contact.status_code == 201
+    assert with_contact.json()["numero_contacto"] == "+57 300 123 4567"
+    assert without_contact.status_code == 201
+    assert without_contact.json()["numero_contacto"] is None
 
 
 def test_hu11_producto_exige_todos_los_campos_incluido_proveedor(client):
@@ -155,6 +175,50 @@ def test_hu16_actualizacion_de_producto_rechaza_valores_nulos(client):
     )
 
     assert response.status_code == 422
+
+
+def test_hu16_producto_se_elimina_logicamente_y_puede_reactivarse(client, db_engine):
+    headers = auth_headers(client)
+    provider = crear_proveedor(client, headers).json()
+    product = crear_producto(client, headers, provider["id"]).json()
+    stock_response = client.post(
+        "/sedes/1/inventario",
+        json={"producto_id": product["id"], "cantidad": 5},
+        headers=headers,
+    )
+    assert stock_response.status_code == 200
+
+    deactivated = client.patch(
+        f"/productos/{product['id']}",
+        json={"estado": False},
+        headers=headers,
+    )
+
+    assert deactivated.status_code == 200
+    assert deactivated.json()["estado"] is False
+    assert all(
+        row["producto_id"] != product["id"]
+        for row in client.get("/inventario", headers=headers).json()
+    )
+    with sessionmaker(bind=db_engine)() as db:
+        stored_product = db.query(Producto).filter_by(id=product["id"]).one()
+        stored_stock = db.query(Inventario).filter_by(
+            sede_id=1,
+            producto_id=product["id"],
+        ).one()
+        assert stored_product.estado is False
+        assert stored_stock.cantidad == 5
+
+    reactivated = client.patch(
+        f"/productos/{product['id']}",
+        json={"estado": True},
+        headers=headers,
+    )
+
+    assert reactivated.status_code == 200
+    assert reactivated.json()["estado"] is True
+    restored_inventory = client.get("/inventario", headers=headers).json()
+    assert any(row["producto_id"] == product["id"] for row in restored_inventory)
 
 
 def test_hu18_informacion_general_autorizada(client):

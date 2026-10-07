@@ -1,3 +1,5 @@
+"""Modelos ORM de sedes y mesas físicas."""
+
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
@@ -5,6 +7,7 @@ from app.core.database import Base
 
 
 class Sede(Base):
+    """Sede operativa que reúne mesas, asignaciones y existencias."""
     __tablename__ = "sedes"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -18,6 +21,7 @@ class Sede(Base):
 
 
 class Mesa(Base):
+    """Mesa numerada por sede; su estado operativo deriva de pedidos abiertos."""
     __tablename__ = "mesas"
     __table_args__ = (UniqueConstraint("sede_id", "numero", name="uq_mesas_sede_numero"),)
 

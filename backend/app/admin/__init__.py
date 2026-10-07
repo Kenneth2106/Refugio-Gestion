@@ -1,1 +1,1 @@
-"""Administrative API routes."""
+"""Resumen administrativo que agrega información de los módulos autorizados."""
