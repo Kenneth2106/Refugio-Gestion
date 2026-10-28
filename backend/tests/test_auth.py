@@ -100,6 +100,21 @@ def test_hu06_logout_revokes_session_and_clears_cookie(client, db_engine):
         assert ended.revocada_en is not None
 
 
+def test_hu01_cors_allows_configured_frontend_origin_with_credentials(client):
+    response = client.options(
+        "/auth/login",
+        headers={
+            "Origin": "http://127.0.0.1:5175",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:5175"
+    assert response.headers["access-control-allow-credentials"] == "true"
+
+
 def test_hu34_expired_token_is_rejected(client):
     expired_token = create_access_token(
         {

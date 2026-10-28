@@ -26,9 +26,13 @@ class Settings(BaseSettings):
         default=30, alias="SESSION_MAX_MINUTES", gt=0
     )
     cookie_secure: bool = Field(default=True, alias="COOKIE_SECURE")
+    cookie_samesite: str = Field(default="lax", alias="COOKIE_SAMESITE")
     auth_cookie_name: str = "refugio_access_token"
     frontend_url: str = Field(
         default="http://127.0.0.1:5175", alias="FRONTEND_URL"
+    )
+    allowed_origins: str = Field(
+        default="http://127.0.0.1:5175", alias="ALLOWED_ORIGINS"
     )
 
     @field_validator("secret_key")
@@ -47,6 +51,15 @@ class Settings(BaseSettings):
         if "CAMBIAR_PASSWORD" in value:
             raise ValueError("Actualiza DATABASE_URL con credenciales válidas")
         return value
+
+    @field_validator("cookie_samesite")
+    @classmethod
+    def validate_cookie_samesite(cls, value: str) -> str:
+        """Limita SameSite a los valores soportados por los navegadores."""
+        normalized = value.strip().lower()
+        if normalized not in {"lax", "strict", "none"}:
+            raise ValueError("COOKIE_SAMESITE debe ser lax, strict o none")
+        return normalized
 
     @property
     def jwt_secret_key(self) -> str:
@@ -67,5 +80,11 @@ ALGORITHM = settings.algorithm
 SESSION_INACTIVITY_MINUTES = settings.session_inactivity_minutes
 SESSION_MAX_MINUTES = settings.session_max_minutes
 COOKIE_SECURE = settings.cookie_secure
+COOKIE_SAMESITE = settings.cookie_samesite
 AUTH_COOKIE_NAME = settings.auth_cookie_name
 FRONTEND_URL = settings.frontend_url.rstrip("/")
+ALLOWED_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in settings.allowed_origins.split(",")
+    if origin.strip()
+]

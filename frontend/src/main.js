@@ -3,6 +3,10 @@ import "./styles.css"
 // Entrada de la SPA: estado compartido del navegador y navegación por vistas sin framework.
 const app = document.querySelector("#app")
 const INACTIVITY_MS = 3 * 60 * 1000
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? "" : "https://refugio-gestion.onrender.com")
+).replace(/\/+$/, "")
 // La navegación es común; este control visual no sustituye los permisos de la API.
 const navigation = [
   { path: "/dashboard", label: "Overview", icon: "⌂", access: "any" },
@@ -71,12 +75,16 @@ function errorMessage(detail, status) {
   return detail || "The request could not be completed. Please try again."
 }
 
+function apiUrl(path) {
+  return `${API_BASE_URL}${path}`
+}
+
 async function api(path, options = {}) {
   // Centraliza las peticiones JSON, la cookie de sesión y la presentación segura de errores HTTP.
   let response
   try {
-    response = await fetch(path, {
-      credentials: "same-origin",
+    response = await fetch(apiUrl(path), {
+      credentials: "include",
       ...options,
       headers: {
         ...(options.body ? { "Content-Type": "application/json" } : {}),
@@ -93,7 +101,7 @@ async function api(path, options = {}) {
   } catch {
     if (response.ok) {
       throw new Error(
-        `The API response from ${path} was not JSON. Open the frontend on its configured Vite port and verify the backend is running.`,
+        `The API response from ${path} was not JSON. Verify the API URL and backend deployment.`,
       )
     }
   }
@@ -116,7 +124,7 @@ async function apiArray(path) {
 }
 
 async function downloadExcel(path) {
-  const response = await fetch(path, { credentials: "same-origin" })
+  const response = await fetch(apiUrl(path), { credentials: "include" })
   if (!response.ok) {
     let result = {}
     try {

@@ -5,11 +5,12 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth.router import router as auth_router
 from app.admin.router import router as admin_router
 from app.catalogo.router import router as catalogo_router
-from app.core.settings import FRONTEND_URL
+from app.core.settings import ALLOWED_ORIGINS, FRONTEND_URL
 from app.inventario.router import router as inventario_router
 from app.sedes.router import router as sedes_router
 from app.usuarios.router import router as usuarios_router
@@ -19,6 +20,13 @@ from app.ventas.caja_router import router as caja_router
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Sistema Refugio Gestión")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Cada módulo mantiene sus rutas separadas y las publica bajo esta aplicación.
 app.include_router(auth_router)

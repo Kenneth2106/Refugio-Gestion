@@ -23,6 +23,7 @@ from app.core.security import create_access_token, decode_access_token, verify_p
 from app.core.settings import (
     AUTH_COOKIE_NAME,
     COOKIE_SECURE,
+    COOKIE_SAMESITE,
     SESSION_INACTIVITY_MINUTES,
     SESSION_MAX_MINUTES,
 )
@@ -205,7 +206,7 @@ def get_current_session(
         max_age=max(1, int(token_lifetime.total_seconds())),
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="lax",
+        samesite=COOKIE_SAMESITE,
         path="/",
     )
     response.headers["Cache-Control"] = "no-store"
@@ -397,7 +398,7 @@ def login(
         max_age=int(lifetime.total_seconds()),
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="lax",
+        samesite=COOKIE_SAMESITE,
         path="/",
     )
     response.headers["Cache-Control"] = "no-store"
@@ -498,7 +499,7 @@ def logout(
         key=AUTH_COOKIE_NAME,
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="lax",
+        samesite=COOKIE_SAMESITE,
         path="/",
     )
     return {"message": "Sesión cerrada correctamente"}
