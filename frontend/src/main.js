@@ -4,6 +4,7 @@ import "./styles.css"
 const app = document.querySelector("#app")
 const INACTIVITY_MS = 3 * 60 * 1000
 const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
   import.meta.env.VITE_API_BASE_URL ||
   (import.meta.env.DEV ? "" : "https://refugio-gestion.onrender.com")
 ).replace(/\/+$/, "")

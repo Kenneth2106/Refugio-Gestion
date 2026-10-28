@@ -31,9 +31,11 @@ El backend es un Web Service con `backend` como raíz, el comando de inicio
 
 El frontend se publica como Static Site con raíz `frontend`, comando de build
 `npm install && npm run build` y directorio de publicación `dist`. Define
-`VITE_API_BASE_URL=https://refugio-gestion.onrender.com` en su entorno de build.
-El código usa esa variable, conserva el proxy de Vite en desarrollo y usa el
-backend de Render como respaldo en builds de producción.
+`VITE_API_URL=https://refugio-gestion.onrender.com` en su entorno de build antes
+de desplegar o volver a desplegar. Vite incorpora esta variable durante el
+build. El código también acepta `VITE_API_BASE_URL` por compatibilidad, conserva
+el proxy de Vite en desarrollo y usa el backend de Render como respaldo en
+builds de producción.
 
 Neon ya contiene datos y la revisión Alembic `0003_caja_reportes_auditoria`;
 no restaures un dump encima. Ejecuta `alembic upgrade head` contra Neon solo si
