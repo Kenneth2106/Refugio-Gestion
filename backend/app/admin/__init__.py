@@ -1,0 +1,1 @@
+"""Resumen administrativo que agrega información de los módulos autorizados."""

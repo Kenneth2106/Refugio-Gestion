@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173b35">
+  <title>Administración | Refugio Gestión</title>
+  <style>
+    :root {
+      font-family: "Segoe UI", sans-serif;
+      color: #202c29;
+      background: #f2f4ef;
+      font-synthesis: none;
+      --forest: #173b35;
+      --green: #286656;
+      --red: #a64f3c;
+      --gold: #d3a64d;
+      --line: #d5ddd7;
+      --muted: #5d6964;
+    }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; }
+    button, input, select { font: inherit; }
+    header {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 12px 24px;
+      background: var(--forest);
+      color: #f5f4e8;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font: 20px Georgia, serif; }
+    .mark { display: grid; width: 36px; aspect-ratio: 1; place-items: center; border: 1px solid #93b7a1; color: #e5c878; font: 700 18px "Segoe UI", sans-serif; }
+    .account { display: flex; align-items: center; gap: 16px; }
+    .account span { color: #d2ddd5; font-size: 14px; }
+    button { min-height: 40px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--forest); font-weight: 600; cursor: pointer; }
+    button:hover { background: #eaf0eb; }
+    button:disabled { cursor: wait; opacity: 0.65; }
+    .logout-button { padding: 8px 13px; border-color: #91aa9d; background: transparent; color: #fff; }
+    .logout-button:hover { background: #28564b; }
+    .layout { min-height: calc(100vh - 68px); display: grid; grid-template-columns: 232px minmax(0, 1fr); }
+    aside { padding: 28px 16px; border-right: 1px solid var(--line); background: #fff; }
+    .nav-label { margin: 0 12px 12px; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    nav { display: grid; gap: 5px; }
+    .nav-link { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 9px 12px; border-color: transparent; background: transparent; text-align: left; }
+    .nav-link[aria-current="page"] { border-color: #d8e5dc; background: #eaf0eb; color: var(--forest); }
+    .nav-icon { display: grid; width: 24px; aspect-ratio: 1; place-items: center; color: var(--red); font-size: 15px; }
+    main { min-width: 0; padding: clamp(24px, 4vw, 48px); }
+    .view { width: min(100%, 1120px); margin: 0 auto; }
+    .view[hidden] { display: none; }
+    .eyebrow { margin: 0 0 9px; color: var(--red); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 0; font: 400 clamp(32px, 4vw, 44px)/1.1 Georgia, serif; }
+    h2 { margin: 0 0 18px; font: 400 25px Georgia, serif; }
+    h3 { margin: 0 0 14px; font-size: 16px; }
+    .rule { width: 56px; height: 3px; margin: 18px 0 28px; background: var(--gold); }
+    .intro { max-width: 680px; color: var(--muted); line-height: 1.6; }
+    .section-head { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
+    .section-head p { margin: 7px 0 0; color: var(--muted); }
+    .form-section, .table-section { padding: 24px 0; border-top: 1px solid var(--line); }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; max-width: 760px; }
+    label { display: grid; gap: 7px; color: #35443e; font-size: 13px; font-weight: 600; }
+    input, select { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid #b9c5bd; border-radius: 4px; background: #fff; color: #202c29; }
+    input:focus, select:focus { border-color: var(--green); outline: 3px solid #c5ded1; }
+    select[multiple] { min-height: 104px; }
+    .wide { grid-column: 1 / -1; }
+    fieldset { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 0; padding: 13px 14px; border: 1px solid var(--line); border-radius: 4px; }
+    legend { padding: 0 5px; color: #35443e; font-size: 13px; font-weight: 600; }
+    .check { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+    .check input { width: 17px; min-height: 17px; accent-color: var(--green); }
+    .primary { justify-self: start; min-width: 155px; padding: 9px 15px; border-color: var(--red); background: var(--red); color: #fff; }
+    .primary:hover { background: #873f31; }
+    .danger { min-height: 34px; padding: 6px 10px; border-color: #d7b5ab; color: #873f31; font-size: 12px; }
+    .feedback { min-height: 22px; margin: 10px 0 0; color: var(--green); font-size: 13px; }
+    .feedback.error { color: #9a3028; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 12px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    th { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    td { font-size: 13px; }
+    .empty { color: var(--muted); }
+    @media (max-width: 760px) {
+      header { padding-inline: 16px; }
+      .layout { grid-template-columns: 1fr; }
+      aside { padding: 10px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .nav-label { display: none; }
+      nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .nav-link { justify-content: center; padding-inline: 6px; font-size: 12px; }
+      main { padding: 25px 16px; }
+    }
+    @media (max-width: 520px) {
+      .brand { font-size: 17px; }
+      .account { gap: 8px; }
+      .account span { max-width: 150px; overflow-wrap: anywhere; font-size: 12px; }
+      .logout-button { padding-inline: 8px; font-size: 12px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .wide { grid-column: auto; }
+      fieldset { gap: 10px 14px; }
+      th, td { padding: 10px 7px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="mark" aria-hidden="true">R</span> Refugio Gestión</div>
+    <div class="account">
+      <span>{{ email }}</span>
+      <button class="logout-button" id="logout-button" type="button">Cerrar sesión</button>
+    </div>
+  </header>
+  <div class="layout">
+    <aside aria-label="Administración">
+      <p class="nav-label">Administración</p>
+      <nav>
+        <button class="nav-link" type="button" data-view="overview" aria-current="page"><span class="nav-icon" aria-hidden="true">⌂</span>Resumen</button>
+        <button class="nav-link" type="button" data-view="users"><span class="nav-icon" aria-hidden="true">♙</span>Usuarios</button>
+        <button class="nav-link" type="button" data-view="sites"><span class="nav-icon" aria-hidden="true">⌖</span>Sedes</button>
+        <button class="nav-link" type="button" data-view="tables"><span class="nav-icon" aria-hidden="true">▦</span>Mesas</button>
+      </nav>
+    </aside>
+    <main>
+      <section class="view" data-panel="overview">
+        <p class="eyebrow">Área administrativa</p>
+        <h1>Gestión del refugio</h1>
+        <div class="rule" aria-hidden="true"></div>
+        <p class="intro">Administra las cuentas, las sedes autorizadas y la distribución de mesas. Los cambios se guardan en el sistema y se validan en el backend.</p>
+        <p id="session-status">Sesión activa · {{ email }}</p>
+        <p class="feedback" id="global-feedback" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="view" data-panel="users" hidden>
+        <div class="section-head"><div><p class="eyebrow">Acceso y permisos</p><h1>Usuarios</h1><p>Registra cuentas y asigna roles y sedes.</p></div></div>
+        <form id="user-form" class="form-section">
+          <h2>Nuevo usuario</h2>
+          <div class="form-grid">
+            <label>Identificación<input name="identificacion" required maxlength="30" autocomplete="off"></label>
+            <label>Nombre completo<input name="nombre" required maxlength="100" autocomplete="name"></label>
+            <label>Nombre de usuario<input name="nombre_usuario" required minlength="3" maxlength="50" autocomplete="username"></label>
+            <label>Correo electrónico<input name="email" type="email" required autocomplete="email"></label>
+            <label>Contraseña inicial<input name="password" type="password" required minlength="8" maxlength="72" autocomplete="new-password"></label>
+            <fieldset class="wide">
+              <legend>Roles</legend>
+              <label class="check"><input name="es_admin" type="checkbox">Administrador</label>
+              <label class="check"><input name="es_mesero" type="checkbox">Mesero</label>
+              <label class="check"><input name="es_cajero" type="checkbox">Cajero</label>
+            </fieldset>
+            <label class="wide">Sedes autorizadas<select id="user-sites" name="sedes_ids" multiple required></select></label>
+            <button class="primary" type="submit">Crear usuario</button>
+          </div>
+          <p class="feedback" id="user-feedback" role="status" aria-live="polite"></p>
+        </form>
+        <form id="user-edit-form" class="form-section" hidden>
+          <input name="usuario_id" type="hidden">
+          <h2>Editar usuario</h2>
+          <div class="form-grid">
+            <label>Nombre completo<input name="nombre" required maxlength="100"></label>
+            <label>Nombre de usuario<input name="nombre_usuario" required minlength="3" maxlength="50"></label>
+            <label>Correo electrónico<input name="email" type="email" required></label>
+            <label>Nueva contraseña (opcional)<input name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password"></label>
+            <fieldset class="wide">
+              <legend>Roles</legend>
+              <label class="check"><input name="es_admin" type="checkbox">Administrador</label>
+              <label class="check"><input name="es_mesero" type="checkbox">Mesero</label>
+              <label class="check"><input name="es_cajero" type="checkbox">Cajero</label>
+              <label class="check"><input name="estado" type="checkbox">Usuario activo</label>
+            </fieldset>
+            <label class="wide">Sedes autorizadas<select id="edit-user-sites" name="sedes_ids" multiple required></select></label>
+            <button class="primary" type="submit">Guardar cambios</button>
+            <button id="cancel-user-edit" type="button">Cancelar</button>
+          </div>
+          <p class="feedback" id="user-edit-feedback" role="status" aria-live="polite"></p>
+        </form>
+        <section class="table-section">
+          <h2>Personal registrado</h2>
+          <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Usuario</th><th>Correo</th><th>Roles</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="users-list"></tbody></table></div>
+          <p class="feedback" id="users-empty"></p>
+        </section>
+      </section>
+
+      <section class="view" data-panel="sites" hidden>
+        <div class="section-head"><div><p class="eyebrow">Puntos de operación</p><h1>Sedes</h1><p>Registra sedes con código, nombre y dirección.</p></div></div>
+        <form id="site-form" class="form-section">
+          <h2>Nueva sede</h2>
+          <div class="form-grid">
+            <label>Código<input name="codigo" required maxlength="20"></label>
+            <label>Nombre<input name="nombre" required maxlength="100"></label>
+            <label class="wide">Dirección<input name="direccion" required maxlength="200" autocomplete="street-address"></label>
+            <button class="primary" type="submit">Crear sede</button>
+          </div>
+          <p class="feedback" id="site-feedback" role="status" aria-live="polite"></p>
+        </form>
+        <section class="table-section">
+          <h2>Sedes registradas</h2>
+          <div class="table-wrap"><table><thead><tr><th>Código</th><th>Nombre</th><th>Dirección</th><th>Estado</th><th></th></tr></thead><tbody id="sites-list"></tbody></table></div>
+          <p class="feedback" id="sites-empty"></p>
+        </section>
+      </section>
+
+      <section class="view" data-panel="tables" hidden>
+        <div class="section-head"><div><p class="eyebrow">Distribución por sede</p><h1>Mesas</h1><p>Asigna números de mesa a una sede autorizada.</p></div></div>
+        <form id="table-form" class="form-section">
+          <h2>Nueva mesa</h2>
+          <div class="form-grid">
+            <label>Sede<select id="table-site" name="sede_id" required></select></label>
+            <label>Número de mesa<input name="numero" type="number" min="1" step="1" required></label>
+            <button class="primary" type="submit">Crear mesa</button>
+          </div>
+          <p class="feedback" id="table-feedback" role="status" aria-live="polite"></p>
+        </form>
+        <section class="table-section">
+          <h2>Mesas configuradas</h2>
+          <div class="table-wrap"><table><thead><tr><th>Sede</th><th>Mesa</th><th>Estado</th><th></th></tr></thead><tbody id="tables-list"></tbody></table></div>
+          <p class="feedback" id="tables-empty"></p>
+        </section>
+      </section>
+      <p class="feedback error" id="logout-error" role="alert" aria-live="polite"></p>
+    </main>
+  </div>
+  <script>
+    const navButtons = [...document.querySelectorAll("[data-view]")];
+    const panels = [...document.querySelectorAll("[data-panel]")];
+    let usersById = new Map();
+    const feedback = (id, message, isError = false) => {
+      const element = document.getElementById(id);
+      element.textContent = message;
+      element.classList.toggle("error", isError);
+    };
+    const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
+    })[character]);
+
+    navButtons.forEach((button) => button.addEventListener("click", () => {
+      navButtons.forEach((item) => item.removeAttribute("aria-current"));
+      button.setAttribute("aria-current", "page");
+      panels.forEach((panel) => { panel.hidden = panel.dataset.panel !== button.dataset.view; });
+    }));
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        credentials: "same-origin",
+        ...options,
+        headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...options.headers },
+      });
+      let body = {};
+      try { body = await response.json(); } catch { /* Empty response body. */ }
+      if (!response.ok) {
+        const detail = body.detail;
+        const message = Array.isArray(detail)
+          ? detail.map((item) => item.msg).join("; ")
+          : detail || "No fue posible completar la operación.";
+        throw new Error(message);
+      }
+      return body;
+    }
+
+    function option(value, label) {
+      return new Option(label, String(value));
+    }
+
+    async function loadAdminData() {
+      const [users, sites] = await Promise.all([api("/usuarios/"), api("/sedes/")]);
+      usersById = new Map(users.map((user) => [user.id, user]));
+      document.getElementById("users-list").innerHTML = users.map((user) => {
+        const roles = [user.es_admin && "Administrador", user.es_mesero && "Mesero", user.es_cajero && "Cajero"].filter(Boolean).join(", ");
+        const canEdit = user.estado || user.id !== {{ current_user_id }};
+        const canToggle = !user.estado || user.id !== {{ current_user_id }};
+        const toggleAction = user.estado ? "deactivate-user" : "activate-user";
+        const toggleLabel = user.estado ? "Inactivar" : "Activar";
+        const toggleClass = user.estado ? "danger" : "";
+        const actions = `${canEdit ? `<button type="button" data-action="edit-user" data-id="${user.id}">Editar</button> ` : ""}${canToggle ? `<button class="${toggleClass}" type="button" data-action="${toggleAction}" data-id="${user.id}">${toggleLabel}</button>` : ""}`;
+        return `<tr><td>${escapeHtml(user.nombre)}</td><td>${escapeHtml(user.nombre_usuario)}</td><td>${escapeHtml(user.email)}</td><td>${escapeHtml(roles)}</td><td>${user.estado ? "Activo" : "Inactivo"}</td><td>${actions}</td></tr>`;
+      }).join("");
+      feedback("users-empty", users.length ? "" : "No hay usuarios registrados.");
+      document.getElementById("sites-list").innerHTML = sites.map((site) => {
+        const action = site.estado ? "deactivate-site" : "activate-site";
+        const label = site.estado ? "Inactivar" : "Activar";
+        return `<tr><td>${escapeHtml(site.codigo)}</td><td>${escapeHtml(site.nombre)}</td><td>${escapeHtml(site.direccion)}</td><td>${site.estado ? "Activa" : "Inactiva"}</td><td><button class="${site.estado ? "danger" : ""}" type="button" data-action="${action}" data-id="${site.id}">${label}</button></td></tr>`;
+      }).join("");
+      feedback("sites-empty", sites.length ? "" : "No hay sedes asignadas a tu usuario.");
+
+      const activeSites = sites.filter((site) => site.estado);
+      const userSiteSelect = document.getElementById("user-sites");
+      userSiteSelect.replaceChildren(...activeSites.map((site) => option(site.id, `${site.codigo} · ${site.nombre}`)));
+      const editUserSiteSelect = document.getElementById("edit-user-sites");
+      editUserSiteSelect.replaceChildren(...activeSites.map((site) => option(site.id, `${site.codigo} · ${site.nombre}`)));
+      const tableSiteSelect = document.getElementById("table-site");
+      tableSiteSelect.replaceChildren(option("", "Selecciona una sede"), ...activeSites.map((site) => option(site.id, `${site.codigo} · ${site.nombre}`)));
+
+      const tablesBySite = await Promise.all(activeSites.map(async (site) => ({
+        site,
+        tables: await api(`/sedes/${site.id}/mesas`),
+      })));
+      const tables = tablesBySite.flatMap(({ site, tables: siteTables }) => siteTables.map((table) => ({ ...table, site })));
+      document.getElementById("tables-list").innerHTML = tables.map((table) => {
+        const action = table.estado ? "deactivate-table" : "activate-table";
+        const label = table.estado ? "Inactivar" : "Activar";
+        return `<tr><td>${escapeHtml(table.site.nombre)}</td><td>${table.numero}</td><td>${table.estado ? "Activa" : "Inactiva"}</td><td><button class="${table.estado ? "danger" : ""}" type="button" data-action="${action}" data-id="${table.id}">${label}</button></td></tr>`;
+      }).join("");
+      feedback("tables-empty", tables.length ? "" : "No hay mesas configuradas para tus sedes.");
+    }
+
+    document.getElementById("user-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const roles = ["es_admin", "es_mesero", "es_cajero"];
+      const selectedRoles = Object.fromEntries(roles.map((name) => [name, form.elements[name].checked]));
+      if (!Object.values(selectedRoles).some(Boolean)) {
+        feedback("user-feedback", "Selecciona al menos un rol.", true);
+        return;
+      }
+      const payload = {
+        identificacion: form.elements.identificacion.value.trim(),
+        nombre: form.elements.nombre.value.trim(),
+        nombre_usuario: form.elements.nombre_usuario.value.trim(),
+        email: form.elements.email.value.trim(),
+        password: form.elements.password.value,
+        ...selectedRoles,
+        sedes_ids: [...document.getElementById("user-sites").selectedOptions].map((site) => Number(site.value)),
+      };
+      const button = form.querySelector("button[type=submit]");
+      button.disabled = true;
+      try {
+        await api("/usuarios/", { method: "POST", body: JSON.stringify(payload) });
+        form.reset();
+        feedback("user-feedback", "Usuario creado.");
+        await loadAdminData();
+      } catch (error) { feedback("user-feedback", error.message, true); }
+      finally { button.disabled = false; }
+    });
+
+    const userEditForm = document.getElementById("user-edit-form");
+    userEditForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const roles = ["es_admin", "es_mesero", "es_cajero"];
+      const selectedRoles = Object.fromEntries(roles.map((name) => [name, form.elements[name].checked]));
+      if (!Object.values(selectedRoles).some(Boolean)) {
+        feedback("user-edit-feedback", "Selecciona al menos un rol.", true);
+        return;
+      }
+      const payload = {
+        nombre: form.elements.nombre.value.trim(),
+        nombre_usuario: form.elements.nombre_usuario.value.trim(),
+        email: form.elements.email.value.trim(),
+        estado: form.elements.estado.checked,
+        ...selectedRoles,
+        sedes_ids: [...document.getElementById("edit-user-sites").selectedOptions].map((site) => Number(site.value)),
+      };
+      if (form.elements.password.value) payload.password = form.elements.password.value;
+      const button = form.querySelector("button[type=submit]");
+      button.disabled = true;
+      try {
+        await api(`/usuarios/${Number(form.elements.usuario_id.value)}`, { method: "PATCH", body: JSON.stringify(payload) });
+        form.reset();
+        form.hidden = true;
+        feedback("user-edit-feedback", "Cambios guardados.");
+        await loadAdminData();
+      } catch (error) { feedback("user-edit-feedback", error.message, true); }
+      finally { button.disabled = false; }
+    });
+
+    document.getElementById("cancel-user-edit").addEventListener("click", () => {
+      userEditForm.reset();
+      userEditForm.hidden = true;
+      feedback("user-edit-feedback", "");
+    });
+
+    document.getElementById("site-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector("button[type=submit]");
+      button.disabled = true;
+      try {
+        await api("/sedes/", { method: "POST", body: JSON.stringify({
+          codigo: form.elements.codigo.value.trim(),
+          nombre: form.elements.nombre.value.trim(),
+          direccion: form.elements.direccion.value.trim(),
+        }) });
+        form.reset();
+        feedback("site-feedback", "Sede creada y asignada a tu usuario.");
+        await loadAdminData();
+      } catch (error) { feedback("site-feedback", error.message, true); }
+      finally { button.disabled = false; }
+    });
+
+    document.getElementById("table-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector("button[type=submit]");
+      button.disabled = true;
+      try {
+        await api(`/sedes/${Number(form.elements.sede_id.value)}/mesas`, {
+          method: "POST",
+          body: JSON.stringify({ numero: Number(form.elements.numero.value) }),
+        });
+        form.elements.numero.value = "";
+        feedback("table-feedback", "Mesa creada.");
+        await loadAdminData();
+      } catch (error) { feedback("table-feedback", error.message, true); }
+      finally { button.disabled = false; }
+    });
+
+    document.addEventListener("click", async (event) => {
+      const button = event.target.closest("button[data-action]");
+      if (!button) return;
+      if (button.dataset.action === "edit-user") {
+        const user = usersById.get(Number(button.dataset.id));
+        if (!user) return;
+        const form = userEditForm;
+        form.elements.usuario_id.value = user.id;
+        form.elements.nombre.value = user.nombre;
+        form.elements.nombre_usuario.value = user.nombre_usuario;
+        form.elements.email.value = user.email;
+        form.elements.es_admin.checked = user.es_admin;
+        form.elements.es_mesero.checked = user.es_mesero;
+        form.elements.es_cajero.checked = user.es_cajero;
+        form.elements.estado.checked = user.estado;
+        [...document.getElementById("edit-user-sites").options].forEach((site) => {
+          site.selected = user.sedes_ids.includes(Number(site.value));
+        });
+        form.hidden = false;
+        form.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      if (!window.confirm("¿Deseas cambiar el estado de este registro?")) return;
+      button.disabled = true;
+      try {
+        if (button.dataset.action === "deactivate-user") await api(`/usuarios/${button.dataset.id}/inactivar`, { method: "PATCH" });
+        if (button.dataset.action === "activate-user") await api(`/usuarios/${button.dataset.id}`, { method: "PATCH", body: JSON.stringify({ estado: true }) });
+        if (["activate-site", "deactivate-site"].includes(button.dataset.action)) await api(`/sedes/${button.dataset.id}`, { method: "PATCH", body: JSON.stringify({ estado: button.dataset.action === "activate-site" }) });
+        if (["activate-table", "deactivate-table"].includes(button.dataset.action)) await api(`/sedes/mesas/${button.dataset.id}`, { method: "PATCH", body: JSON.stringify({ estado: button.dataset.action === "activate-table" }) });
+        await loadAdminData();
+      } catch (error) { feedback("global-feedback", error.message, true); }
+    });
+
+    document.getElementById("logout-button").addEventListener("click", async (event) => {
+      event.currentTarget.disabled = true;
+      try {
+        await api("/auth/logout", { method: "POST" });
+        window.location.replace("/login");
+      } catch (error) {
+        feedback("logout-error", error.message, true);
+        event.currentTarget.disabled = false;
+      }
+    });
+
+    window.setTimeout(() => window.location.replace("/login?expired=1"), Math.min({{ expires_in_seconds }} * 1000, 2147483647));
+    let lastActivityTime = Date.now();
+    let isPinging = false;
+    const recordActivity = () => { lastActivityTime = Date.now(); };
+    ["mousemove", "keydown", "click", "scroll"].forEach((eventName) => window.addEventListener(eventName, recordActivity));
+    window.setInterval(async () => {
+      const now = Date.now();
+      if (now - lastActivityTime >= {{ inactivity_timeout_seconds }} * 1000) {
+        window.location.replace("/login?inactivity=1");
+        return;
+      }
+      if (!isPinging && now - lastActivityTime < 60000) {
+        isPinging = true;
+        try {
+          const response = await fetch("/auth/ping", { method: "POST" });
+          if (response.status === 401) window.location.replace("/login?inactivity=1");
+        } catch (error) { console.error(error); }
+        finally { isPinging = false; }
+      }
+    }, 30000);
+
+    loadAdminData().catch((error) => feedback("global-feedback", error.message, true));
+  </script>
+</body>
+</html>

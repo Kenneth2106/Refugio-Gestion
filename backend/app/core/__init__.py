@@ -1,0 +1,1 @@
+"""Configuración, persistencia y utilidades compartidas del backend."""

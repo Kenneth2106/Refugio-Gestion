@@ -1,0 +1,1 @@
+"""Catálogo central de productos y proveedores."""

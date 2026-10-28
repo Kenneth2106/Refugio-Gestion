@@ -1,0 +1,1 @@
+"""Existencias enteras de productos, separadas por sede."""
