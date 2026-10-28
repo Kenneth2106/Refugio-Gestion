@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -53,3 +54,57 @@ class PedidoOut(BaseModel):
     creado_en: datetime
     productos: list[LineaPedidoOut]
     total: Decimal
+
+
+class PagoCreate(BaseModel):
+    """Medio de pago permitido para cerrar un pedido sin editar su valor."""
+    model_config = ConfigDict(extra="forbid")
+
+    medio_pago: Literal["EFECTIVO", "TARJETA"]
+
+
+class PedidoPendienteOut(BaseModel):
+    """Resumen de pedido abierto visible al cajero de la sede."""
+    id: int
+    usuario_id: int
+    usuario_nombre: str
+    sede_id: int
+    mesa_id: int
+    creado_en: datetime
+    total: Decimal
+
+
+class FacturaLineaOut(BaseModel):
+    producto_id: int
+    codigo: str
+    nombre: str
+    cantidad: int
+    precio_unitario: Decimal
+    subtotal: Decimal
+
+
+class FacturaOut(BaseModel):
+    """Comprobante calculado a partir del pedido cerrado."""
+    pedido_id: int
+    sede_id: int
+    mesa_id: int
+    creado_en: datetime
+    cerrado_en: datetime
+    cerrado_por: int
+    medio_pago: Literal["EFECTIVO", "TARJETA"]
+    productos: list[FacturaLineaOut]
+    total: Decimal
+
+
+class ReporteVentaOut(BaseModel):
+    """Agregado de venta por producto y sede con precios históricos."""
+    producto_id: int
+    codigo: str
+    nombre: str
+    cantidad: int
+    valor_compra: Decimal
+    precio_venta: Decimal
+    valor_venta: Decimal
+    ganancia: Decimal
+    sede_id: int
+    sede: str

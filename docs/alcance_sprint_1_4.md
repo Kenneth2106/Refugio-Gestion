@@ -1,4 +1,7 @@
-# Alcance aprobado para Sprints 1 a 4
+# Alcance aprobado para Sprints 1 a 6
+
+Este alcance amplía la entrega previamente aprobada para los Sprints 1 a 4,
+según la solicitud de completar el proyecto hasta el Sprint 6.
 
 ## Incluido
 
@@ -6,22 +9,20 @@
 - **Sprint 2:** HU-04, HU-07, HU-08, HU-09, HU-10 y HU-35.
 - **Sprint 3:** HU-11, HU-12, HU-13, HU-16 y HU-18.
 - **Sprint 4:** HU-19, HU-20, HU-21, HU-22, HU-23, HU-24, HU-25 y HU-33.
+- **Sprint 5:** HU-14, HU-15, HU-26, HU-27, HU-28, HU-29 y HU-30.
+- **Sprint 6:** HU-17, HU-31, HU-32, HU-38, HU-39 y HU-40.
 
 ## Excluido
 
-No implementar HU-14, HU-15, HU-17, HU-26 a HU-32 ni HU-38 a HU-40.
-También queda excluido todo lo definido en la sección 18 de la propuesta
-comercial.
+HU-14 y HU-15 no se incorporan como permisos asignables: el administrador
+conserva las capacidades operativas globales ya confirmadas. También queda
+excluido todo lo definido en la sección 18 de la propuesta comercial.
 
 ## Exclusiones transversales de esta entrega
 
-- En la implementación inicial del backend, frontend; queda incorporada por
-  aprobación posterior como una entrega HTML5/CSS3/JavaScript que consume los
-  endpoints existentes REST/JSON.
-- Exportación a Excel.
+- La interfaz usa HTML5/CSS3/JavaScript nativo y consume endpoints REST/JSON.
 - Despliegue con Nginx, TLS o Gunicorn.
-- Pagos, cierre de pedidos y otras funcionalidades posteriores al alcance
-  definido para el Sprint 4.
+- Funcionalidades no listadas expresamente en los Sprints 1 a 6.
 
 ## Decisiones funcionales confirmadas
 
@@ -36,7 +37,7 @@ comercial.
   permite reducir manualmente la existencia; los pedidos la descuentan.
 - El proveedor tiene un ID generado por la base de datos, un nombre único por
   coincidencia exacta y un número de contacto opcional. Cada producto se asocia
-  con un proveedor.
+  con un proveedor. El precio de compra no puede superar el precio de venta.
 - Los usuarios nuevos quedan activos al crearse; el alta no recibe un campo
   `estado`. Por decisión posterior, el correo electrónico es obligatorio y se
   valida al crear una cuenta; en una actualización parcial puede omitirse.
@@ -52,5 +53,5 @@ comercial.
   un módulo no permitido, se muestra un aviso de permisos; el backend sigue
   siendo quien valida autorización en cada petición.
 - La interfaz cubre los módulos backend en alcance: usuarios, sedes, catálogo,
-  inventario, mesas y pedidos abiertos. No añade pagos, cierre, reportes,
-  exportación ni despliegue.
+  inventario, mesas, pedidos, caja, facturación visible en pantalla y reportes
+  de ventas exportables a Excel.

@@ -263,10 +263,12 @@ def test_hu23_agregar_producto_solo_a_pedido_abierto(client, db_engine):
     assert added.status_code == 200
     assert len(added.json()["productos"]) == 2
     assert sum(line["cantidad"] for line in added.json()["productos"]) == 3
-    with sessionmaker(bind=db_engine)() as db:
-        pedido = db.query(Pedido).filter_by(id=order["id"]).one()
-        pedido.estado = "CERRADO"
-        db.commit()
+    closed = client.post(
+        f"/caja/pedidos/{order['id']}/pago",
+        json={"medio_pago": "EFECTIVO"},
+        headers=auth_headers(client),
+    )
+    assert closed.status_code == 200
 
     rejected = client.post(
         f"/pedidos/{order['id']}/productos",

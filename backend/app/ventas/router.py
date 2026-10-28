@@ -12,6 +12,7 @@ from app.auth.router import (
     require_mesero,
     require_selected_site,
 )
+from app.auditoria.models import EventoAuditoria
 from app.catalogo.models import Producto
 from app.core.clock import get_utc_now
 from app.core.database import get_db
@@ -35,8 +36,8 @@ def serialize_order(pedido: Pedido) -> PedidoOut:
         LineaPedidoOut(
             id=line.id,
             producto_id=line.producto_id,
-            codigo=line.producto.codigo,
-            nombre=line.producto.nombre,
+            codigo=line.codigo_producto,
+            nombre=line.nombre_producto,
             cantidad=line.cantidad,
             precio_unitario=line.precio_unitario,
             usuario_id=line.usuario_id,
@@ -120,6 +121,9 @@ def add_order_lines(
                 producto_id=product_id,
                 cantidad=quantity,
                 precio_unitario=products[product_id].precio_venta,
+                precio_compra_unitario=products[product_id].precio_compra,
+                codigo_producto=products[product_id].codigo,
+                nombre_producto=products[product_id].nombre,
                 usuario_id=usuario.id,
                 creado_en=now,
             )
@@ -227,6 +231,16 @@ def crear_pedido(
         stocks,
         now,
     )
+    db.flush()
+    db.add(
+        EventoAuditoria(
+            actor_id=session.usuario.id,
+            sede_id=sede.id,
+            pedido_id=pedido.id,
+            accion="PEDIDO_CREADO",
+            creado_en=now,
+        )
+    )
     db.commit()
     db.refresh(pedido)
     return serialize_order(pedido)
@@ -279,6 +293,15 @@ def agregar_producto(
         {producto.id: producto},
         stocks,
         now,
+    )
+    db.add(
+        EventoAuditoria(
+            actor_id=session.usuario.id,
+            sede_id=sede.id,
+            pedido_id=pedido.id,
+            accion="PRODUCTOS_AGREGADOS",
+            creado_en=now,
+        )
     )
     db.commit()
     db.refresh(pedido)

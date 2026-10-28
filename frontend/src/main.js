@@ -12,6 +12,8 @@ const navigation = [
   { path: "/dashboard/inventory", label: "Inventory", icon: "▤", access: "inventory" },
   { path: "/dashboard/tables", label: "Tables", icon: "▦", access: "tables" },
   { path: "/dashboard/orders", label: "Orders", icon: "≡", access: "waiter" },
+  { path: "/dashboard/cashier", label: "Cashier", icon: "$", access: "cashier" },
+  { path: "/dashboard/reports", label: "Sales reports", icon: "▧", access: "report" },
 ]
 
 const state = {
@@ -25,6 +27,10 @@ const state = {
   lastActivity: Date.now(),
   heartbeatBusy: false,
   noticeTimer: null,
+  cashOrderId: null,
+  cashInvoice: null,
+  reportFilters: {},
+  reportRows: [],
 }
 
 // Utilidades de presentación y comunicación REST común a todos los módulos.
@@ -51,6 +57,9 @@ function errorMessage(detail, status) {
     "La mesa ya tiene un pedido abierto": "This table already has an open order.",
     "Inventario insuficiente para uno o más productos": "There is not enough inventory for one or more products.",
     "Solo se pueden modificar pedidos abiertos": "Only open orders can be modified.",
+    "Se requieren permisos de cajero": "Cashier permission is required.",
+    "El pedido ya fue cerrado": "This order has already been closed.",
+    "El precio de compra no puede superar el precio de venta": "Purchase price cannot exceed sale price.",
   }
   if (Array.isArray(detail)) return "Check the required fields and try again."
   if (messages[detail]) return messages[detail]
@@ -82,7 +91,11 @@ async function api(path, options = {}) {
   try {
     result = await response.json()
   } catch {
-    if (response.ok) return {}
+    if (response.ok) {
+      throw new Error(
+        `The API response from ${path} was not JSON. Open the frontend on its configured Vite port and verify the backend is running.`,
+      )
+    }
   }
   if (!response.ok) {
     const error = new Error(errorMessage(result.detail, response.status))
@@ -90,6 +103,37 @@ async function api(path, options = {}) {
     throw error
   }
   return result
+}
+
+async function apiArray(path) {
+  const result = await api(path)
+  if (!Array.isArray(result)) {
+    throw new Error(
+      `The API response from ${path} was not a list. Verify the backend version and API route.`,
+    )
+  }
+  return result
+}
+
+async function downloadExcel(path) {
+  const response = await fetch(path, { credentials: "same-origin" })
+  if (!response.ok) {
+    let result = {}
+    try {
+      result = await response.json()
+    } catch {
+      result = {}
+    }
+    throw new Error(errorMessage(result.detail, response.status))
+  }
+  const url = window.URL.createObjectURL(await response.blob())
+  const link = document.createElement("a")
+  link.href = url
+  link.download = "reporte_ventas.xlsx"
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
 }
 
 function hasRole(role) {
@@ -101,6 +145,7 @@ function hasAccess(access) {
   if (access === "any") return true
   if (access === "admin") return Boolean(state.user?.is_admin)
   if (access === "waiter") return hasRole("mesero")
+  if (access === "cashier" || access === "report") return hasRole("cajero")
   if (access === "inventory" || access === "tables") {
     return hasRole("mesero") || Boolean(state.user?.is_admin)
   }
@@ -187,17 +232,16 @@ function siteSelector() {
 }
 
 function sidebar() {
-  return `<aside class="sidebar" aria-label="Main navigation">
-    <p class="sidebar-heading">Workspace</p>
-    <nav class="sidebar-nav">
+  return `<nav class="top-navigation" aria-label="Main navigation">
+    <div class="top-navigation-inner">
       ${navigation.map((item) => `
         <a class="sidebar-link ${state.path === item.path ? "active" : ""}"
            href="${item.path}" data-nav="${item.path}">
           <span class="nav-icon" aria-hidden="true">${item.icon}</span>
           <span>${item.label}</span>
         </a>`).join("")}
-    </nav>
-  </aside>`
+    </div>
+  </nav>`
 }
 
 function shell(content) {
@@ -214,15 +258,17 @@ function shell(content) {
       </a>
       <div class="topbar-right">${siteSelector()}
         <div class="account-actions">
-          <span class="account-name">${escapeHtml(state.user.nombre)}
+          <span class="account-name"><span class="account-avatar" aria-hidden="true">${escapeHtml(state.user.nombre.trim().slice(0, 1).toUpperCase())}</span>
+            <span class="account-copy">${escapeHtml(state.user.nombre)}
             <small>${escapeHtml(roles)}</small>
+            </span>
           </span>
           <button class="button button-quiet" data-action="logout" type="button">Sign out</button>
         </div>
       </div>
     </header>
+    ${sidebar()}
     <div class="dashboard-layout">
-      ${sidebar()}
       <main class="workspace"><div class="workspace-inner">${content}</div></main>
     </div>
     ${state.notice ? `<div class="toast ${state.noticeKind === "error" ? "toast-error" : state.noticeKind === "success" ? "toast-success" : ""}" role="status">${escapeHtml(state.notice)}</div>` : ""}
@@ -230,9 +276,18 @@ function shell(content) {
 }
 
 function pageHeading(kicker, title, lead = "") {
-  return `<p class="page-kicker">${escapeHtml(kicker)}</p>
-    <h1 class="page-title">${escapeHtml(title)}</h1>
-    ${lead ? `<p class="page-lead">${escapeHtml(lead)}</p>` : ""}`
+  return `<header class="page-hero">
+    <div class="page-hero-copy">
+      <p class="page-kicker">${escapeHtml(kicker)}</p>
+      <h1 class="page-title">${escapeHtml(title)}</h1>
+      ${lead ? `<p class="page-lead">${escapeHtml(lead)}</p>` : ""}
+    </div>
+    <div class="page-hero-art" aria-hidden="true">
+      <span class="hero-orbit hero-orbit-one"></span>
+      <span class="hero-orbit hero-orbit-two"></span>
+      <img src="/brand-logo.svg" alt="" loading="lazy">
+    </div>
+  </header>`
 }
 
 function deniedPage() {
@@ -335,8 +390,11 @@ async function renderUsers() {
         <label class="field">Password<input name="password" type="password" minlength="8" maxlength="72" autocomplete="new-password"></label>
         <label class="field" data-status-field hidden>Account status<select name="estado"><option value="true">Active</option><option value="false">Inactive</option></select></label>
         <label class="field">Role<select name="role"><option value="mesero">Waiter</option><option value="cajero">Cashier</option><option value="admin">Administrator</option></select></label>
-        <label class="field field-wide" data-site-field>Authorized locations (required for operational users)
-          <select name="sedes_ids" multiple size="3">${activeSites.map((site) => `<option value="${site.id}">${escapeHtml(site.codigo)} · ${escapeHtml(site.nombre)}</option>`).join("")}</select>
+        <label class="field field-wide" data-site-field>Authorized location (required for operational users)
+          <select name="sedes_ids">
+            <option value="">Select a location</option>
+            ${activeSites.map((site) => `<option value="${site.id}">${escapeHtml(site.codigo)} · ${escapeHtml(site.nombre)}</option>`).join("")}
+          </select>
         </label>
         <div class="form-actions"><button class="button button-primary" type="submit">Create user</button>
           <button class="button" data-action="cancel-user-edit" type="button" hidden>Cancel</button></div>
@@ -346,8 +404,8 @@ async function renderUsers() {
 }
 
 function roleLabels(user) {
+  if (user.es_admin) return "Administrator"
   return [
-    user.es_admin && "Administrator",
     user.es_mesero && "Waiter",
     user.es_cajero && "Cashier",
   ].filter(Boolean).join(", ")
@@ -464,9 +522,9 @@ async function renderOrders() {
       <p class="notice">Choose a working location in the top bar to view and create orders.</p>`
   }
   const [orders, inventory, tables] = await Promise.all([
-    api("/pedidos"),
-    api("/inventario"),
-    api(`/sedes/${state.user.sede_seleccionada_id}/mesas`),
+    apiArray("/pedidos"),
+    apiArray("/inventario"),
+    apiArray(`/sedes/${state.user.sede_seleccionada_id}/mesas`),
   ])
   const freeTables = tables.filter((table) => table.estado && table.estado_operativo === "LIBRE")
   const availableProducts = inventory.filter((item) => item.cantidad > 0)
@@ -501,6 +559,97 @@ async function renderOrders() {
       ${orders.length ? `<div class="order-list">${orderRows}</div>` : `<p class="empty-state">No orders have been created for this location.</p>`}</section>`
 }
 
+function invoiceMarkup(invoice) {
+  const rows = invoice.productos.map((line) => `<tr>
+    <td>${escapeHtml(line.codigo)} · ${escapeHtml(line.nombre)}</td>
+    <td>${line.cantidad}</td><td>${formatMoney(line.precio_unitario)}</td>
+    <td>${formatMoney(line.subtotal)}</td></tr>`).join("")
+  return `<section class="section-block invoice-card">
+    <div class="section-heading"><div><h2>Payment receipt · Order #${invoice.pedido_id}</h2>
+      <p>${escapeHtml(siteName(invoice.sede_id))} · Table ${invoice.mesa_id} · ${new Date(invoice.cerrado_en).toLocaleString()}</p></div>
+      <button class="button" data-action="print-invoice" type="button">Print receipt</button></div>
+    <p>Payment method: <strong>${escapeHtml(invoice.medio_pago)}</strong></p>
+    ${tableMarkup(["Product", "Units", "Unit price", "Subtotal"], rows)}
+    <p class="invoice-total">Total: ${formatMoney(invoice.total)}</p>
+  </section>`
+}
+
+async function renderCashier() {
+  if (!state.user.sede_seleccionada_id) {
+    return `${pageHeading("Cashier operations", "Pending payments", "Select an authorized location to continue.")}
+      <p class="notice">Choose a working location in the top bar to see pending orders.</p>`
+  }
+  const orders = await apiArray("/caja/pedidos-pendientes")
+  const selectedOrder = state.cashOrderId
+    ? await api(`/caja/pedidos/${state.cashOrderId}`)
+    : null
+  const rows = orders.map((order) => `<tr>
+    <td>#${order.id}</td><td>Table ${order.mesa_id}</td>
+    <td>${escapeHtml(order.usuario_nombre)}</td>
+    <td>${new Date(order.creado_en).toLocaleString()}</td>
+    <td>${formatMoney(order.total)}</td>
+    <td><button class="button button-small" data-action="view-cash-order" data-order="${order.id}" type="button">View details</button></td>
+  </tr>`).join("")
+  const details = selectedOrder && selectedOrder.estado === "ABIERTO"
+    ? `<section class="section-block">
+        <div class="section-heading"><div><h2>Order #${selectedOrder.id} · Table ${selectedOrder.mesa_id}</h2>
+          <p>Charge the complete system-calculated total of ${formatMoney(selectedOrder.total)}.</p></div></div>
+        <ul class="order-lines">${selectedOrder.productos.map((line) => `<li>
+          ${line.cantidad} × ${escapeHtml(line.nombre)} <span>${formatMoney(line.precio_unitario * line.cantidad)}</span>
+        </li>`).join("")}</ul>
+        <form class="inline-form" data-form="payment" data-order="${selectedOrder.id}">
+          <label class="field">Payment method<select name="medio_pago" required>
+            <option value="EFECTIVO">Cash</option><option value="TARJETA">Card</option>
+          </select></label>
+          <button class="button button-primary" type="submit">Charge and close order</button>${feedback()}
+        </form>
+      </section>`
+    : ""
+  return `${pageHeading("Cashier operations", "Pending payments", `Open orders at ${siteName(state.user.sede_seleccionada_id)}.`)}
+    ${state.cashInvoice ? invoiceMarkup(state.cashInvoice) : ""}
+    ${details}
+    <section class="section-block"><div class="section-heading"><div><h2>Orders to charge</h2><p>${orders.length} pending order(s)</p></div></div>
+      ${tableMarkup(["Order", "Table", "Created by", "Date and time", "Total", "Action"], rows, "There are no orders awaiting payment.")}</section>`
+}
+
+function reportQuery(filters) {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) query.set(key, value)
+  }
+  return query.toString()
+}
+
+async function renderReports() {
+  const filters = state.reportFilters
+  const query = reportQuery(filters)
+  state.reportRows = await apiArray(`/reportes/ventas${query ? `?${query}` : ""}`)
+  const rows = state.reportRows.map((row) => `<tr>
+    <td>${escapeHtml(row.codigo)}</td><td>${escapeHtml(row.nombre)}</td>
+    <td>${row.cantidad}</td><td>${formatMoney(row.valor_compra)}</td>
+    <td>${formatMoney(row.precio_venta)}</td><td>${formatMoney(row.valor_venta)}</td>
+    <td>${formatMoney(row.ganancia)}</td><td>${escapeHtml(siteName(row.sede_id))}</td>
+  </tr>`).join("")
+  return `${pageHeading("Business performance", "Sales reports", "Closed sales only. Filter by closing date, authorized location and payment method.")}
+    <form class="section-block" data-form="report">
+      <div class="form-grid">
+        <label class="field">Closing date<input name="fecha_fin" type="date" value="${escapeHtml(filters.fecha_fin || "")}"></label>
+        <label class="field">Authorized location<select name="sede_id">
+          <option value="">All authorized locations</option>
+          ${state.sites.filter((site) => site.estado).map((site) => `<option value="${site.id}" ${String(filters.sede_id || "") === String(site.id) ? "selected" : ""}>${escapeHtml(site.codigo)} · ${escapeHtml(site.nombre)}</option>`).join("")}
+        </select></label>
+        <label class="field">Payment method<select name="medio_pago">
+          <option value="">All methods</option>
+          <option value="EFECTIVO" ${filters.medio_pago === "EFECTIVO" ? "selected" : ""}>Cash</option>
+          <option value="TARJETA" ${filters.medio_pago === "TARJETA" ? "selected" : ""}>Card</option>
+        </select></label>
+        <div class="form-actions"><button class="button button-primary" type="submit">Apply filters</button>
+          <button class="button" data-action="export-report" type="button">Export to Excel</button></div>
+      </div>${feedback()}</form>
+    <section class="section-block report-table-section"><div class="section-heading"><div><h2>Sales by product and location</h2><p>${state.reportRows.length} result(s)</p></div></div>
+      ${tableMarkup(["Product code", "Product", "Units sold", "Purchase value", "Sale price", "Sales value", "Profit", "Location"], rows, "No sales match these filters.")}</section>`
+}
+
 async function renderLogin() {
   const reason = state.notice
   const reasonMarkup = reason ? `<p class="notice" role="status">${escapeHtml(reason)}</p>` : ""
@@ -530,6 +679,8 @@ const pageRenderers = {
   "/dashboard/inventory": renderInventory,
   "/dashboard/tables": renderTables,
   "/dashboard/orders": renderOrders,
+  "/dashboard/cashier": renderCashier,
+  "/dashboard/reports": renderReports,
 }
 
 async function render() {
@@ -575,7 +726,8 @@ function formDataObject(form) {
 }
 
 function selectedSites(form) {
-  return [...form.elements.sedes_ids.selectedOptions].map((option) => Number(option.value))
+  const siteId = Number(form.elements.sedes_ids.value)
+  return siteId ? [siteId] : []
 }
 
 function resetUserForm(form) {
@@ -724,6 +876,24 @@ async function onSubmit(event) {
         }),
       })
       await refreshPage("Product added to the open order.")
+      return
+    }
+    if (type === "payment") {
+      state.cashInvoice = await api(`/caja/pedidos/${form.dataset.order}/pago`, {
+        method: "POST",
+        body: JSON.stringify({ medio_pago: data.medio_pago }),
+      })
+      state.cashOrderId = null
+      await refreshPage("Payment recorded and order closed.")
+      return
+    }
+    if (type === "report") {
+      state.reportFilters = {
+        fecha_fin: data.fecha_fin,
+        sede_id: data.sede_id,
+        medio_pago: data.medio_pago,
+      }
+      await render()
     }
   } catch (error) {
     if (error.status === 401) {
@@ -744,6 +914,40 @@ async function refreshPage(message) {
   await render()
 }
 
+function confirmAction(title, message, confirmLabel) {
+  const dialog = document.createElement("dialog")
+  dialog.className = "app-confirm-dialog"
+  dialog.setAttribute("aria-labelledby", "confirm-dialog-title")
+  dialog.setAttribute("aria-describedby", "confirm-dialog-message")
+
+  const heading = document.createElement("h2")
+  heading.id = "confirm-dialog-title"
+  heading.textContent = title
+  const description = document.createElement("p")
+  description.id = "confirm-dialog-message"
+  description.textContent = message
+  const actions = document.createElement("div")
+  actions.className = "confirm-dialog-actions"
+  actions.innerHTML = `
+    <button class="button" type="submit" value="cancel">Cancel</button>
+    <button class="button button-primary" type="submit" value="confirm">${escapeHtml(confirmLabel)}</button>`
+  const form = document.createElement("form")
+  form.method = "dialog"
+  form.append(heading, description, actions)
+  dialog.append(form)
+  document.body.append(dialog)
+
+  return new Promise((resolve) => {
+    dialog.addEventListener("close", () => {
+      const confirmed = dialog.returnValue === "confirm"
+      dialog.remove()
+      resolve(confirmed)
+    }, { once: true })
+    dialog.showModal()
+    actions.querySelector('[value="cancel"]').focus()
+  })
+}
+
 async function onAction(actionElement) {
   const action = actionElement.dataset.action
   try {
@@ -756,6 +960,15 @@ async function onAction(actionElement) {
     } else if (action === "reload-page") {
       setNotice("")
       await render()
+    } else if (action === "view-cash-order") {
+      state.cashOrderId = Number(actionElement.dataset.order)
+      state.cashInvoice = null
+      await render()
+    } else if (action === "export-report") {
+      const query = reportQuery(state.reportFilters)
+      await downloadExcel(`/reportes/ventas/excel${query ? `?${query}` : ""}`)
+    } else if (action === "print-invoice") {
+      window.print()
     } else if (action === "cancel-user-edit") {
       resetUserForm(actionElement.closest("form"))
     } else if (action === "edit-user") {
@@ -778,13 +991,12 @@ async function onAction(actionElement) {
       form.querySelector('[data-action="cancel-user-edit"]').hidden = false
       form.querySelector("[data-site-field]").hidden = Boolean(user.es_admin)
       form.elements.role.value = user.es_admin ? "admin" : user.es_mesero ? "mesero" : "cajero"
-      for (const option of form.elements.sedes_ids.options) {
-        option.selected = user.sedes_ids.includes(Number(option.value))
-      }
+      form.elements.sedes_ids.value = String(user.sedes_ids[0] || "")
       form.scrollIntoView({ behavior: "smooth", block: "start" })
     } else if (action === "toggle-user") {
       const user = await api(`/usuarios/${actionElement.dataset.user}`)
-      if (!window.confirm(`${user.estado ? "Deactivate" : "Reactivate"} ${user.nombre}?`)) return
+      const verb = user.estado ? "Deactivate" : "Reactivate"
+      if (!await confirmAction(`${verb} user?`, `Are you sure you want to ${verb.toLowerCase()} ${user.nombre}?`, verb)) return
       await api(user.estado ? `/usuarios/${user.id}/inactivar` : `/usuarios/${user.id}`, {
         method: "PATCH",
         ...(user.estado ? {} : { body: JSON.stringify({ estado: true }) }),
@@ -796,7 +1008,8 @@ async function onAction(actionElement) {
         (entry) => entry.id === Number(actionElement.dataset.site),
       )
       if (!site) throw new Error("The requested location could not be found.")
-      if (!window.confirm(`${site.estado ? "Deactivate" : "Reactivate"} ${site.nombre}?`)) return
+      const verb = site.estado ? "Deactivate" : "Reactivate"
+      if (!await confirmAction(`${verb} location?`, `Are you sure you want to ${verb.toLowerCase()} ${site.nombre}?`, verb)) return
       await api(`/sedes/${site.id}`, {
         method: "PATCH",
         body: JSON.stringify({ estado: !site.estado }),
@@ -804,7 +1017,8 @@ async function onAction(actionElement) {
       await refreshPage(site.estado ? "Location deactivated." : "Location reactivated.")
     } else if (action === "toggle-table") {
       const active = actionElement.dataset.active === "true"
-      if (!window.confirm(`${active ? "Deactivate" : "Reactivate"} this table?`)) return
+      const verb = active ? "Deactivate" : "Reactivate"
+      if (!await confirmAction(`${verb} table?`, `Are you sure you want to ${verb.toLowerCase()} this table?`, verb)) return
       await api(`/sedes/mesas/${actionElement.dataset.table}`, {
         method: "PATCH",
         body: JSON.stringify({ estado: !active }),
@@ -873,6 +1087,8 @@ document.addEventListener("change", async (event) => {
       body: JSON.stringify({ sede_id: Number(event.target.value) }),
     })
     state.user.sede_seleccionada_id = result.sede_seleccionada_id
+    state.cashOrderId = null
+    state.cashInvoice = null
     setNotice("Working location changed.", "success")
     await render()
   } catch (error) {

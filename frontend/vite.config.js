@@ -9,6 +9,8 @@ const apiPaths = [
   "/proveedores",
   "/inventario",
   "/pedidos",
+  "/caja",
+  "/reportes",
   "/admin",
 ]
 

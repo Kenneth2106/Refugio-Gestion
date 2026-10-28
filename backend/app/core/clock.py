@@ -1,6 +1,10 @@
 """Reloj UTC central para fechas operativas y pruebas con tiempo inyectado."""
 
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+
+BUSINESS_TIMEZONE = ZoneInfo("America/Bogota")
 
 
 def get_utc_now() -> datetime:

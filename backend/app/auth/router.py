@@ -9,6 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.orm import Session
 
+from app.auditoria.models import EventoAuditoria
 from app.auth.models import SesionActiva
 from app.auth.schemas import (
     CurrentUserSchema,
@@ -380,6 +381,14 @@ def login(
             sede_seleccionada_id=selected_site_id,
         )
     )
+    db.add(
+        EventoAuditoria(
+            actor_id=usuario.id,
+            sede_id=selected_site_id,
+            accion="INICIO_SESION",
+            creado_en=now,
+        )
+    )
     db.commit()
 
     response.set_cookie(
@@ -444,6 +453,14 @@ def select_site(
         .one()
     )
     active_session.sede_seleccionada_id = selection.sede_id
+    db.add(
+        EventoAuditoria(
+            actor_id=session.usuario.id,
+            sede_id=selection.sede_id,
+            accion="SEDE_SELECCIONADA",
+            creado_en=get_utc_now(),
+        )
+    )
     db.commit()
     return {"sede_seleccionada_id": selection.sede_id}
 
@@ -466,7 +483,16 @@ def logout(
     )
     if active_session is not None:
         active_session.activa = False
-        active_session.revocada_en = get_utc_now()
+        now = get_utc_now()
+        active_session.revocada_en = now
+        db.add(
+            EventoAuditoria(
+                actor_id=session.usuario.id,
+                sede_id=session.sede_seleccionada_id,
+                accion="CIERRE_SESION",
+                creado_en=now,
+            )
+        )
         db.commit()
     response.delete_cookie(
         key=AUTH_COOKIE_NAME,

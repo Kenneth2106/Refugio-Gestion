@@ -14,6 +14,7 @@ from app.inventario.router import router as inventario_router
 from app.sedes.router import router as sedes_router
 from app.usuarios.router import router as usuarios_router
 from app.ventas.router import router as ventas_router
+from app.ventas.caja_router import router as caja_router
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ app.include_router(sedes_router)
 app.include_router(catalogo_router)
 app.include_router(inventario_router)
 app.include_router(ventas_router)
+app.include_router(caja_router)
 
 
 # No expone excepciones internas al cliente ni registra tokens o contraseñas.

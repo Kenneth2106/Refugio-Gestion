@@ -32,6 +32,22 @@ def test_hu37_alembic_upgrade_downgrade_upgrade_on_empty_schema(db_engine):
         assert "numero_contacto" in {
             column["name"] for column in inspect(connection).get_columns("proveedores")
         }
+        assert {
+            "medio_pago",
+            "cerrado_por",
+            "cerrado_en",
+        } <= {
+            column["name"] for column in inspect(connection).get_columns("pedidos")
+        }
+        assert {
+            "precio_compra_unitario",
+            "codigo_producto",
+            "nombre_producto",
+        } <= {
+            column["name"]
+            for column in inspect(connection).get_columns("lineas_pedido")
+        }
+        assert "eventos_auditoria" in upgraded_tables
 
         indexes = inspect(connection).get_indexes("pedidos")
         open_order_index = next(

@@ -32,7 +32,6 @@ class ProductoCreate(BaseModel):
     estado: bool
     proveedor_id: int = Field(gt=0)
 
-
 class ProductoUpdate(BaseModel):
     """Campos modificables de producto; solo se actualizan los enviados."""
     model_config = ConfigDict(extra="forbid")
