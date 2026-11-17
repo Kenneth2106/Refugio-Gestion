@@ -64,7 +64,8 @@ function errorMessage(detail, status) {
     "Solo se pueden modificar pedidos abiertos": "Only open orders can be modified.",
     "Se requieren permisos de cajero": "Cashier permission is required.",
     "El pedido ya fue cerrado": "This order has already been closed.",
-    "El precio de compra no puede superar el precio de venta": "Purchase price cannot exceed sale price.",
+    "El precio de venta debe ser mayor al precio de compra": "Sale price must be greater than purchase price.",
+    "La fecha inicial no puede ser posterior a la fecha final": "Start date must be on or before end date.",
   }
   if (Array.isArray(detail)) return "Check the required fields and try again."
   if (messages[detail]) return messages[detail]
@@ -465,7 +466,7 @@ async function renderProducts() {
       <div class="form-grid">
         <label class="field">Product code<input name="codigo" maxlength="40" required></label>
         <label class="field">Product name<input name="nombre" maxlength="120" required></label>
-        <label class="field">Sale price<input name="precio_venta" inputmode="decimal" type="number" min="0" step="0.01" required></label>
+        <label class="field">Sale price<input name="precio_venta" inputmode="decimal" type="number" min="0.01" step="0.01" required></label>
         <label class="field">Purchase price<input name="precio_compra" inputmode="decimal" type="number" min="0" step="0.01" required></label>
         <label class="field">Supplier<select name="proveedor_id" required><option value="">Select a supplier</option>${providerOptions}</select></label>
         <label class="check-field"><input name="estado" type="checkbox" checked>Product active</label>
@@ -639,10 +640,11 @@ async function renderReports() {
     <td>${formatMoney(row.precio_venta)}</td><td>${formatMoney(row.valor_venta)}</td>
     <td>${formatMoney(row.ganancia)}</td><td>${escapeHtml(siteName(row.sede_id))}</td>
   </tr>`).join("")
-  return `${pageHeading("Business performance", "Sales reports", "Closed sales only. Filter by closing date, authorized location and payment method.")}
+  return `${pageHeading("Business performance", "Sales reports", "Closed sales only. Filter by closing date range, authorized location and payment method.")}
     <form class="section-block" data-form="report">
       <div class="form-grid">
-        <label class="field">Closing date<input name="fecha_fin" type="date" value="${escapeHtml(filters.fecha_fin || "")}"></label>
+        <label class="field">Closing date from<input name="fecha_inicio" type="date" value="${escapeHtml(filters.fecha_inicio || "")}"></label>
+        <label class="field">Closing date to<input name="fecha_fin" type="date" value="${escapeHtml(filters.fecha_fin || "")}"></label>
         <label class="field">Authorized location<select name="sede_id">
           <option value="">All authorized locations</option>
           ${state.sites.filter((site) => site.estado).map((site) => `<option value="${site.id}" ${String(filters.sede_id || "") === String(site.id) ? "selected" : ""}>${escapeHtml(site.codigo)} · ${escapeHtml(site.nombre)}</option>`).join("")}
@@ -767,6 +769,20 @@ async function onSubmit(event) {
   showFeedback(form, "")
   try {
     const data = formDataObject(form)
+    if (
+      type === "product"
+      && Number(data.precio_venta) <= Number(data.precio_compra)
+    ) {
+      throw new Error("Sale price must be greater than purchase price.")
+    }
+    if (
+      type === "report"
+      && data.fecha_inicio
+      && data.fecha_fin
+      && data.fecha_inicio > data.fecha_fin
+    ) {
+      throw new Error("Start date must be on or before end date.")
+    }
     // Los formularios se traducen a las rutas REST; la validación final corresponde a FastAPI.
     if (type === "login") {
       await api("/auth/login", {
@@ -898,6 +914,7 @@ async function onSubmit(event) {
     }
     if (type === "report") {
       state.reportFilters = {
+        fecha_inicio: data.fecha_inicio,
         fecha_fin: data.fecha_fin,
         sede_id: data.sede_id,
         medio_pago: data.medio_pago,
@@ -1076,6 +1093,34 @@ async function onAction(actionElement) {
 
 // Listeners delegados: mantienen funcionales los controles que se recrean en cada render.
 document.addEventListener("submit", onSubmit)
+document.addEventListener("input", (event) => {
+  const form = event.target.closest('form[data-form="product"]')
+  if (form) {
+    const salePrice = form.elements.precio_venta
+    const purchasePrice = form.elements.precio_compra
+    const hasBothPrices = salePrice.value !== "" && purchasePrice.value !== ""
+    const invalidPrices = Number(salePrice.value) <= Number(purchasePrice.value)
+    purchasePrice.setCustomValidity(
+      hasBothPrices && invalidPrices
+        ? "Sale price must be greater than purchase price."
+        : "",
+    )
+    return
+  }
+
+  const reportForm = event.target.closest('form[data-form="report"]')
+  if (reportForm) {
+    const startDate = reportForm.elements.fecha_inicio
+    const endDate = reportForm.elements.fecha_fin
+    const invalidRange = startDate.value && endDate.value && startDate.value > endDate.value
+    startDate.setCustomValidity(
+      invalidRange ? "Start date must be on or before end date." : "",
+    )
+    endDate.setCustomValidity(
+      invalidRange ? "Start date must be on or before end date." : "",
+    )
+  }
+})
 document.addEventListener("click", (event) => {
   const nav = event.target.closest("[data-nav]")
   if (nav) {

@@ -50,8 +50,9 @@ Aplica las migraciones antes de iniciar la versión nueva:
 - `POST /caja/pedidos/{id}/pago` registra `EFECTIVO` o `TARJETA` y cierra el
   pedido por su total calculado; `GET /caja/pedidos/{id}/factura` consulta el
   comprobante.
-- `GET /reportes/ventas` muestra únicamente pedidos cerrados y acepta `fecha_fin`
-  (filtra el día de cierre en `America/Bogota`), `sede_id` y `medio_pago`.
+- `GET /reportes/ventas` muestra únicamente pedidos cerrados y acepta `fecha_inicio`
+  y `fecha_fin` (ambos extremos inclusivos, según el día de cierre en
+  `America/Bogota`), `sede_id` y `medio_pago`.
   `GET /reportes/ventas/excel` exporta el mismo resultado filtrado. Ambas rutas
   comprueban rol y sedes autorizadas en backend.
 

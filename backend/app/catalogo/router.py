@@ -64,10 +64,10 @@ def crear_producto(
     _: Usuario = Depends(require_admin),
 ) -> Producto:
     """Crea producto central después de comprobar el proveedor."""
-    if producto_in.precio_compra > producto_in.precio_venta:
+    if producto_in.precio_compra >= producto_in.precio_venta:
         raise HTTPException(
             status_code=422,
-            detail="El precio de compra no puede superar el precio de venta",
+            detail="El precio de venta debe ser mayor al precio de compra",
         )
     if db.query(Proveedor.id).filter(Proveedor.id == producto_in.proveedor_id).first() is None:
         raise HTTPException(status_code=404, detail="Proveedor no encontrado")
@@ -126,10 +126,10 @@ def actualizar_producto(
         raise HTTPException(status_code=422, detail="Los campos no pueden ser nulos")
     purchase_price = values.get("precio_compra", producto.precio_compra)
     sale_price = values.get("precio_venta", producto.precio_venta)
-    if purchase_price > sale_price:
+    if purchase_price >= sale_price:
         raise HTTPException(
             status_code=422,
-            detail="El precio de compra no puede superar el precio de venta",
+            detail="El precio de venta debe ser mayor al precio de compra",
         )
     proveedor_id = values.get("proveedor_id")
     if proveedor_id is not None and (

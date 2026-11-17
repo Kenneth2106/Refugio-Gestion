@@ -135,7 +135,7 @@ def test_hu11_producto_usa_decimal_y_catalogo_es_central(client, db_engine):
     assert any(entry["codigo"] == "PROD-01" for entry in listed.json())
 
 
-def test_hu11_rechaza_precio_compra_superior_al_precio_venta(client):
+def test_hu11_precio_venta_debe_superar_estrictamente_al_precio_compra(client):
     headers = auth_headers(client)
     provider = crear_proveedor(client, headers).json()
     rejected = crear_producto(
@@ -144,6 +144,14 @@ def test_hu11_rechaza_precio_compra_superior_al_precio_venta(client):
         provider["id"],
         precio_venta="100.00",
         precio_compra="100.01",
+    )
+    rejected_equal = crear_producto(
+        client,
+        headers,
+        provider["id"],
+        codigo="PROD-EQUAL",
+        precio_venta="100.00",
+        precio_compra="100.00",
     )
     product = crear_producto(client, headers, provider["id"]).json()
     invalid_update = client.patch(
@@ -156,15 +164,22 @@ def test_hu11_rechaza_precio_compra_superior_al_precio_venta(client):
         json={"precio_venta": "7000.09"},
         headers=headers,
     )
-    valid_update = client.patch(
+    equal_update = client.patch(
         f"/productos/{product['id']}",
         json={"precio_compra": "12500.25"},
         headers=headers,
     )
+    valid_update = client.patch(
+        f"/productos/{product['id']}",
+        json={"precio_compra": "12500.24"},
+        headers=headers,
+    )
 
     assert rejected.status_code == 422
+    assert rejected_equal.status_code == 422
     assert invalid_update.status_code == 422
     assert invalid_sale_update.status_code == 422
+    assert equal_update.status_code == 422
     assert valid_update.status_code == 200
 
 

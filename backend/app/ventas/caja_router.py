@@ -201,10 +201,21 @@ def consultar_factura(
 def query_sales_report(
     db: Session,
     user: Usuario,
+    fecha_inicio: date | None,
     fecha_fin: date | None,
     sede_id: int | None,
     medio_pago: Literal["EFECTIVO", "TARJETA"] | None,
 ) -> list[ReporteVentaOut]:
+    if (
+        fecha_inicio is not None
+        and fecha_fin is not None
+        and fecha_inicio > fecha_fin
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="La fecha inicial no puede ser posterior a la fecha final",
+        )
+
     site_ids = authorized_site_ids(db, user)
     if sede_id is not None and sede_id not in site_ids:
         raise HTTPException(status_code=403, detail="No tienes acceso a esta sede")
@@ -244,14 +255,16 @@ def query_sales_report(
     query = query.filter(Pedido.estado == "CERRADO")
     if medio_pago is not None:
         query = query.filter(Pedido.medio_pago == medio_pago)
+    if fecha_inicio is not None:
+        start = datetime.combine(fecha_inicio, time.min, tzinfo=BUSINESS_TIMEZONE)
+        query = query.filter(Pedido.cerrado_en >= start)
     if fecha_fin is not None:
-        start = datetime.combine(fecha_fin, time.min, tzinfo=BUSINESS_TIMEZONE)
         end = datetime.combine(
             fecha_fin + timedelta(days=1),
             time.min,
             tzinfo=BUSINESS_TIMEZONE,
         )
-        query = query.filter(Pedido.cerrado_en >= start, Pedido.cerrado_en < end)
+        query = query.filter(Pedido.cerrado_en < end)
 
     return [
         ReporteVentaOut(
@@ -277,6 +290,7 @@ def query_sales_report(
 
 @router.get("/reportes/ventas", response_model=list[ReporteVentaOut])
 def consultar_reporte_ventas(
+    fecha_inicio: date | None = Query(default=None),
     fecha_fin: date | None = Query(default=None),
     sede_id: int | None = Query(default=None, gt=0),
     medio_pago: Literal["EFECTIVO", "TARJETA"] | None = None,
@@ -288,6 +302,7 @@ def consultar_reporte_ventas(
     rows = query_sales_report(
         db,
         session.usuario,
+        fecha_inicio,
         fecha_fin,
         sede_id,
         medio_pago,
@@ -306,6 +321,7 @@ def consultar_reporte_ventas(
 
 @router.get("/reportes/ventas/excel")
 def exportar_reporte_ventas(
+    fecha_inicio: date | None = Query(default=None),
     fecha_fin: date | None = Query(default=None),
     sede_id: int | None = Query(default=None, gt=0),
     medio_pago: Literal["EFECTIVO", "TARJETA"] | None = None,
@@ -317,6 +333,7 @@ def exportar_reporte_ventas(
     rows = query_sales_report(
         db,
         session.usuario,
+        fecha_inicio,
         fecha_fin,
         sede_id,
         medio_pago,

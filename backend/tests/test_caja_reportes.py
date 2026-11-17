@@ -196,6 +196,9 @@ def test_hu17_hu31_hu32_reporte_filtrado_y_excel_conservan_datos_autorizados(
         params={
             "medio_pago": "EFECTIVO",
             "sede_id": 1,
+            "fecha_inicio": (
+                date.fromisoformat(closing_date) - timedelta(days=1)
+            ).isoformat(),
             "fecha_fin": closing_date,
         },
         headers=cashier,
@@ -205,6 +208,9 @@ def test_hu17_hu31_hu32_reporte_filtrado_y_excel_conservan_datos_autorizados(
         params={
             "medio_pago": "EFECTIVO",
             "sede_id": 1,
+            "fecha_inicio": (
+                date.fromisoformat(closing_date) - timedelta(days=1)
+            ).isoformat(),
             "fecha_fin": closing_date,
         },
         headers=cashier,
@@ -215,6 +221,25 @@ def test_hu17_hu31_hu32_reporte_filtrado_y_excel_conservan_datos_autorizados(
             "medio_pago": "EFECTIVO",
             "sede_id": 1,
             "fecha_fin": (date.fromisoformat(closing_date) - timedelta(days=1)).isoformat(),
+        },
+        headers=cashier,
+    )
+    invalid_date_range = client.get(
+        "/reportes/ventas",
+        params={
+            "fecha_inicio": (
+                date.fromisoformat(closing_date) + timedelta(days=1)
+            ).isoformat(),
+            "fecha_fin": closing_date,
+        },
+        headers=cashier,
+    )
+    after_closing_day_report = client.get(
+        "/reportes/ventas",
+        params={
+            "fecha_inicio": (
+                date.fromisoformat(closing_date) + timedelta(days=1)
+            ).isoformat(),
         },
         headers=cashier,
     )
@@ -252,6 +277,9 @@ def test_hu17_hu31_hu32_reporte_filtrado_y_excel_conservan_datos_autorizados(
     assert sheet.sheet_view.showGridLines is False
     assert previous_day_report.status_code == 200
     assert previous_day_report.json() == []
+    assert invalid_date_range.status_code == 422
+    assert after_closing_day_report.status_code == 200
+    assert after_closing_day_report.json() == []
     assert denied.status_code == 403
 
 
